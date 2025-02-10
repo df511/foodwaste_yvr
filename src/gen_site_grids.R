@@ -46,7 +46,7 @@ plot(second_beach)
 sites <- do.call(rbind, list(lancaster, weber_rep, strathcona, second_beach))
 sites_3857 <- st_transform(sites, 3857)
 
-
+save(sites_3857, file = here("data","sites_3857.Rdata"))
 
 # Define grid cell size (e.g., 2x2)
 ### size of a single side in meters
