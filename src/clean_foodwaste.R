@@ -226,17 +226,24 @@ aggregated_values <- dat_sf_joined %>%
   summarise(total_weighted_value = sum(weighted_value, na.rm = TRUE))
 
 # Merge back with the grid to retain geometries
-grid_with_values <- st_join(grid_clipped_25m, aggregated_values, left = TRUE)
-grid_with_values <- grid_with_values %>%
+dat_grid <- st_join(grid_clipped_25m, aggregated_values, left = TRUE)
+dat_grid <- dat_grid %>%
   mutate(total_weighted_value = replace_na(total_weighted_value, 0))
 
 
+dat_grid <- dat_grid %>%
+  dplyr::select(-grid_id.y) %>%  # Drop "grid_id.y"
+  dplyr::rename(grid_id = grid_id.x) %>%  # Rename "grid_id.x" to "grid_id"
+  dplyr::rename(fw_score = total_weighted_value)  # Rename "total_weighted_value" to "fw_score"
 
+
+
+save(dat_grid, file = here("data","dat_grid_25.Rdata"))
 
 # Define output file name and resolution
 pdf(here("figs","food_waste_score_map.pdf"), width = 80, height = 64)  # Adjust size as needed
 
-ggplot(grid_with_values) +
+ggplot(dat_grid) +
   geom_sf(aes(fill = log(total_weighted_value)), color = NA) +  # No borders for a smooth heatmap
   scale_fill_viridis_c(option = "inferno", name = "Weighted Value") +  # "inferno" for bright-darker range
   theme_minimal() +
@@ -245,6 +252,4 @@ ggplot(grid_with_values) +
 # Close the PDF device to save the file
 dev.off()
 
-
-save(final_grid, file = here("data","grid_clipped_25m.Rdata"))
 #######

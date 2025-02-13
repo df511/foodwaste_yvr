@@ -1,3 +1,8 @@
+
+
+#### explore site locations
+
+### load libraries
 library(cancensus)
 library(ggplot2)
 #library(tidyverse)
@@ -10,8 +15,9 @@ library(terra)
 library(tidyterra)
 library(here)
 
+
 ### insert your own Google Maps key here
-options(cancensus.api_key = 'CensusMapper_e5809a95267db864f07fd91906dfdc24') ### insert personalized API Key, sign-up here: https://censusmapper.ca/users/sign_up
+options(cancensus.api_key = 'CensusMapper_e5809a95267db864f07fd91906dfdc24')
 
 
 ## define functions 
@@ -146,31 +152,26 @@ ggsave(here("figs","sites_map.pdf"), dpi = 600, scale = 2)
 # 
 # ggsave("figures/sites_map.pdf")
 
-### For how to use the cancensus package: https://cran.r-project.org/web/packages/cancensus/vignettes/cancensus.html
-
-
-census_vec <- list_census_vectors(dataset ="CA21")
-
 #read in census data via query of census mapper
 census_data <- get_census(dataset = 'CA21', regions = list(CSD = "5915022"), 
-
-                                                    vectors = c("v_CA21_1","v_CA21_906","v_CA21_6",
-                                                                "v_CA21_5808","v_CA21_5865", "v_CA21_4204", 
-                                                                "v_CA21_4875","v_CA21_4878", "v_CA21_4881",
-                                                                "v_CA21_4884", "v_CA21_4887", "v_CA21_4890",
-                                                                "v_CA21_4893", "v_CA21_4896", "v_CA21_4899",
-                                                                "v_CA21_4902", "v_CA21_4905", "v_CA21_4908",
-                                                                "v_CA21_4911","v_CA21_4914"),
+                          
+                          vectors = c("v_CA21_1","v_CA21_906","v_CA21_6",
+                                      "v_CA21_5808","v_CA21_5865", "v_CA21_4204", 
+                                      "v_CA21_4875","v_CA21_4878", "v_CA21_4881",
+                                      "v_CA21_4884", "v_CA21_4887", "v_CA21_4890",
+                                      "v_CA21_4893", "v_CA21_4896", "v_CA21_4899",
+                                      "v_CA21_4902", "v_CA21_4905", "v_CA21_4908",
+                                      "v_CA21_4911","v_CA21_4914"),
                           labels = "detailed", geo_format = "sf", level = "DA")
 
 #rename columns
 census_data <- census_data %>% 
-              rename(household_income = `v_CA21_906: Median total income of household in 2020 ($)`,
-                     population = `v_CA21_1: Population, 2021`,
-                     minority_pop = `v_CA21_4875: Total visible minority population`,
-                     black_pop = `v_CA21_4884: Black`, indig_pop = 'v_CA21_4204: Indigenous identity (39)',
-                     pop_km = `v_CA21_6: Population density per square kilometre`
-                     )
+  rename(household_income = `v_CA21_906: Median total income of household in 2020 ($)`,
+         population = `v_CA21_1: Population, 2021`,
+         minority_pop = `v_CA21_4875: Total visible minority population`,
+         black_pop = `v_CA21_4884: Black`, indig_pop = 'v_CA21_4204: Indigenous identity (39)',
+         pop_km = `v_CA21_6: Population density per square kilometre`
+  )
 
 #calculate percemtages of ethnicities per population and create new cols in df
 census_data$black_percent <- census_data$black_pop / census_data$population
@@ -199,126 +200,3 @@ income_map
 ggsave(here("figs","income_map.pdf"), dpi = 600, scale = 2)
 
 hist(census_data$household_income, breaks = 30)
-
-
-## file called "final_grid"
-load(file = here("data", "dat_grid_25.Rdata"))
-
-census_data <- st_transform(census_data, st_crs(dat_grid)) ### ensure the same CRS
-
-# Perform a spatial join
-dat_grid <- st_join(dat_grid, census_data)
-
-### save in file, indicating contents (food waste + demographic vars)
-save(dat_grid, file = here("data","dat_fw_demo_25.Rdata"))
-
-###### plots
-
-
-# Define output file name and resolution
-pdf(here("figs","population_density_map.pdf"), width = 20, height = 16)  # Adjust size as needed
-
-ggplot(dat_grid) +
-  geom_sf(aes(fill = pop_km), color = NA) +  # No borders for a smooth heatmap
-  scale_fill_viridis_c(option = "inferno", name = "Population per Sq. Km.") +  # "inferno" for bright-darker range
-  theme_minimal() +
-  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
-
-
-# Close the PDF device to save the file
-dev.off()
-
-
-# Define output file name and resolution
-pdf(here("figs","visible_minority_percentage_map.pdf"), width = 20, height = 16)  # Adjust size as needed
-
-ggplot(dat_grid) +
-  geom_sf(aes(fill = min_percent), color = NA) +  # No borders for a smooth heatmap
-  scale_fill_viridis_c(option = "inferno", name = "Proportion visible minority population") +  # "inferno" for bright-darker range
-  theme_minimal() +
-  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
-
-
-# Close the PDF device to save the file
-dev.off()
-
-
-# Define output file name and resolution
-pdf(here("figs","indigenous_percentage_map.pdf"), width = 20, height = 16)  # Adjust size as needed
-
-ggplot(dat_grid) +
-  geom_sf(aes(fill = indig_percent), color = NA) +  # No borders for a smooth heatmap
-  scale_fill_viridis_c(option = "inferno", name = "Proportion Indigenous") +  # "inferno" for bright-darker range
-  theme_minimal() +
-  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
-
-
-# Close the PDF device to save the file
-dev.off()
-
-# 
-# 
-# transects1 <- st_intersection(weber_lancaster, census_data)
-# transects2 <- st_intersection(sites, census_data) ### all 13 transects, including new additions 
-# #transect_income3 <- st_intersection(sites_plus_french, census_data)
-# 
-# plot(transects2)
-# hist(transects1$household_income, breaks = 50, xlim = c(20000,170000))
-# hist(transects2$household_income, breaks = 50, xlim = c(20000,170000)) #showing the addition of low income sites
-# #hist(transect_income3$household_income, breaks = 50, xlim = c(20000,170000))
-# 
-# 
-# plot(density(transects2$pop_km)) ### population density across transects
-# plot(density(transects2$minority_pop)) ### population density across transects
-# plot(density(transects2$indig_percent))
-# 
-# Svan1 = get_map(location =c(-123.15, 49.26), zoom = 12, maptype = 'hybrid')
-# 
-# 
-# # census mapper data for % visible minority of total pop in private households
-# 
-# pct_ind_map  <- ggplot() + geom_sf(data = census_data, aes(fill = indig_percent)) + 
-#   scale_fill_viridis(direction = 1, limits=c(0,0.3))  + 
-#   geom_sf(data = sites, color = 'white', fill = NA, lwd = 1) +
-#   scale_y_continuous(breaks = seq(49.2, 49.34, by = 0.005)) + 
-#   scale_x_continuous(breaks = seq(-123.25, -123, by = 0.025))
-# 
-# pct_ind_map
-# 
-# # census mapper data for indig pop as a % of total pop in private households
-# 
-# pct_black_map  <- ggplot() + geom_sf(data = census_data, aes(fill = black_percent)) + 
-#   scale_fill_viridis(direction = 1)  + 
-#   geom_sf(data = sites, color = 'white', fill = NA, linewidth = 1) +
-#   scale_y_continuous(breaks = seq(49.2, 49.34, by = 0.005)) + 
-#   scale_x_continuous(breaks = seq(-123.25, -123, by = 0.025))
-# 
-# pct_black_map
-# 
-# 
-# # census mapper data for % visible minority of total pop in private households
-# 
-# census_data_min <- get_census(dataset='CA21', regions=list(CSD="5915022"),
-#                               vectors=c("v_CA21_4875"), labels="detailed", geo_format="sf", level='DA')
-# 
-# census_data_min <- census_data_min %>% 
-#   rename(minority_pop = `v_CA21_4875: Total visible minority population`)
-# 
-# pct_min_map  <- ggplot() + geom_sf(data = census_data, aes(fill = min_percent)) + 
-#   scale_fill_viridis(direction = 1)  + 
-#   geom_sf(data = sites, color = 'white', fill = NA, lwd = 1) +
-#   scale_y_continuous(breaks = seq(49.2, 49.34, by = 0.025)) + 
-#   scale_x_continuous(breaks = seq(-123.25, -123, by = 0.05))
-# 
-# pct_min_map
-# 
-# 
-# # census mapper data for population density per square kilometer
-# 
-# pop_map  <- ggplot() + geom_sf(data = census_data, aes(fill = pop_km)) + 
-#   scale_fill_viridis(direction = 1)  + 
-#   geom_sf(data = sites, color = 'white', fill = NA, lwd = 1) +
-#   scale_y_continuous(breaks = seq(49.2, 49.34, by = 0.025)) + 
-#   scale_x_continuous(breaks = seq(-123.25, -123, by = 0.05))
-# 
-# pop_map
