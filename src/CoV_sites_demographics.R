@@ -154,7 +154,7 @@ census_vec <- list_census_vectors(dataset ="CA21")
 #read in census data via query of census mapper
 census_data <- get_census(dataset = 'CA21', regions = list(CSD = "5915022"), 
 
-                                                    vectors = c("v_CA21_1","v_CA21_906","v_CA21_6",
+                                                    vectors = c("v_CA21_1","v_CA21_906", "v_CA21_6",
                                                                 "v_CA21_5808","v_CA21_5865", "v_CA21_4204", 
                                                                 "v_CA21_4875","v_CA21_4878", "v_CA21_4881",
                                                                 "v_CA21_4884", "v_CA21_4887", "v_CA21_4890",
