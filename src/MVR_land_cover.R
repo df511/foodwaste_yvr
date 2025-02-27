@@ -36,6 +36,6 @@ lc_prop$grid_id <- 1:nrow(lc_prop)
 dat_grid <- left_join(dat_grid, lc_prop, by = "grid_id")
 
 ### save file
-save(dat_grid, file = here("data","dat_fw_demo_lc_25m.Rdata"))
+save(dat_grid, file = here("data","dat_fw_demo_lc_25.Rdata"))
 
 
