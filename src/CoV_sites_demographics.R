@@ -201,7 +201,7 @@ ggsave(here("figs","income_map.pdf"), dpi = 600, scale = 2)
 hist(census_data$household_income, breaks = 30)
 
 
-## file called "final_grid"
+## object called "dat_grid"
 load(file = here("data", "dat_grid_25.Rdata"))
 
 census_data <- st_transform(census_data, st_crs(dat_grid)) ### ensure the same CRS
@@ -211,6 +211,7 @@ dat_grid <- st_join(dat_grid, census_data)
 
 ### save in file, indicating contents (food waste + demographic vars)
 save(dat_grid, file = here("data","dat_fw_demo_25.Rdata"))
+
 
 ###### plots
 

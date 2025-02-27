@@ -10,42 +10,32 @@
 library(sf)
 library(here)
 library(terra)
-
-### explore layers
-st_layers(here("data","raw","LCC2020.gdb"))
-
-### read multipolygon land cover layer
-lc2020 <- st_read(here("data","raw","LCC2020.gdb"))  # Read specific layer
-
-### read multipolygon land cover layer
-bnd <- st_read(here("data","raw","LCC2020.gdb"), layer = "fras_bnd_LCC2020")  # Read specific layer
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(exactextractr)
 
 
-head(lc2020)
+file_path <- here("data","raw","MetroVan_LCC_2020_final.tif")
+## object called "dat_grid"
+load(file = here("data", "dat_fw_demo_25.Rdata"))
 
-# Read the potential land cover attribute tables
-vat <- st_read(here("data", "raw", "LCC2020.gdb"), layer = "VAT_LCC2020")
+# Force reading as a raster with assumed dimensions
+lcc2020 <- rast(file_path)
 
-vat <- st_read(here("data", "raw", "LCC2020.gdb"), layer = "VAT_LCC2020")
-unique(lc2020$RASTER)  # Check unique values in lc2020
-unique(vat$Value)       # Compare with VAT_LCC2020 values
+lcc2020 <- project(lcc2020, "EPSG:3857")
+van_ext<- c(-13715667.2184339, -13702478.8456052, 6313777.37423673, 6325346.85547016)
+lcc2020_van <- crop(lcc2020, van_ext)
+lcc2020_van <- as.int(lcc2020_van)
 
+lc_prop <- exact_extract(lcc2020_van, dat_grid, fun = "frac")
+#### values from Report (No #14, Snow/Ice) https://metrovancouver.org/services/regional-planning/Documents/mv-land-cover-classification-sei-update-2022.pdf
+colnames(lc_prop) <- c("Buildings", "Paved", "OtherBuilt", "Barren", "Soil","Conifer","Deciduous","Shrub","ModGrassHerb","NatGrassHerb","NonphotoVeg","Water","Shadow")
 
-fras_blk <- st_read(here("data", "raw", "LCC2020.gdb"), layer = "fras_blk_LCC2020")
+lc_prop$grid_id <- 1:nrow(lc_prop)
+dat_grid <- left_join(dat_grid, lc_prop, by = "grid_id")
 
-# View column names
-names(vat)
-names(fras_blk)
-
-# View first few rows
-head(vat)
-head(fras_blk)
-
-
-fras_blk <- st_read(here("data", "raw", "LCC2020.gdb"), layer = "fras_blk_LCC2020")
-head(fras_blk)
-
-
-
+### save file
+save(dat_grid, file = here("data","dat_fw_demo_lc_25m.Rdata"))
 
 

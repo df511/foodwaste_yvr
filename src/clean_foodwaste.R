@@ -180,7 +180,7 @@ weights_type <- c("food_litter" = 10/10,
                   "other" = 2/10,
                   "NA" = 1/10)
 
-# Define weights for food litter density, multiply these by food litter area...
+# Define weights for food litter density, multiply these by food litter area...c
 weights_fld <- c("<visible" = 0.05,
                  "low" = 0.166,
                  "medium" = 0.5,
