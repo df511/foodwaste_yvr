@@ -4,6 +4,8 @@ library(sf)
 library(jsonlite)
 library(dplyr)
 library(ggplot2)
+library(progressr)
+library(data.table)
 
 
 ### Storefronts! ####
@@ -14,19 +16,17 @@ stores <- fromJSON(here("data","raw" ,"storefronts-inventory.json"))
 stores$longitude <- stores$geo_point_2d$lon
 stores$latitude <- stores$geo_point_2d$lat
 ### Convert to sf object
-stores_sf <- st_as_sf(stores, coords = c("longitude", "latitude"), crs = 3857)
+stores_sf <- st_as_sf(stores, coords = c("longitude", "latitude"), crs = 4326)
 ### filter to only food related businesses
 categories <- c("Food & Beverage", "Convenience Goods", "Entertainment and Leisure")
 
 # Filter the sf dataframe
 food_stores <- stores_sf %>%
   filter(retail_category %in% categories)
+rm(stores,stores_sf)
 
 # Check results
 print(food_stores)
-plot(food_stores["retail_category"])  # Color by 'retail_category'
-
-
 
 ggplot(data = food_stores) +
   geom_sf(aes(color = retail_category, fill = retail_category), 
@@ -38,27 +38,72 @@ ggplot(data = food_stores) +
 
 
 ## object called "dat_grid"
-load(file = here("data", "dat_fw_demo_lc_25.Rdata"))
+load(file = here("data", "dat_fw_demo_lc_750.Rdata"))
 unique(food_stores$retail_category)
 head(food_stores)
-# 
-# # Perform a spatial join (assigning points to grid cells)
-# joined <- st_join(dat_grid, food_stores, left = TRUE)
-# 
-# # Create one-hot encoding: Convert "retail_category" into separate columns
-# dat_grid_onehot <- joined %>%
-#   mutate(
-#     Food_Beverage = ifelse(retail_category == "Food & Beverage", 1, 0),
-#     Convenience_Goods = ifelse(retail_category == "Convenience Goods", 1, 0),
-#     Entertainment_Leisure = ifelse(retail_category == "Entertainment and Leisure", 1, 0)
-#   ) %>%
-#   group_by(grid_id) %>%  # Ensure multiple points don't count multiple times
-#   summarise(
-#     Food_Beverage = max(Food_Beverage, na.rm = TRUE),
-#     Convenience_Goods = max(Convenience_Goods, na.rm = TRUE),
-#     Entertainment_Leisure = max(Entertainment_Leisure, na.rm = TRUE),
-#     geometry = first(geometry)  # Keep spatial data
-#   ) %>%
-#   st_as_sf()
-# 
 
+
+food_stores <- food_stores %>%
+  mutate(
+    lon = geo_point_2d$lon,
+    lat = geo_point_2d$lat
+  ) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 3857)
+
+food_stores <- food_stores[, -c(1:4,8,9:11)]
+
+food_stores <- st_transform(food_stores, st_crs(dat_grid))
+
+
+
+# Perform spatial join: Assigns food store points to grid cells
+joined <- st_join(dat_grid, food_stores, left = TRUE) 
+
+
+
+# Enable progress bar
+handlers(global = TRUE)
+
+
+# Convert to data.table
+dt_joined <- as.data.table(joined)
+
+# Convert `retail_category` to a factor for faster comparison
+dt_joined[, retail_category := as.factor(retail_category)]
+
+# # Perform grouped aggregation
+# dat_grid_final <- with_progress({
+#   p <- progressor(along = unique(dt_joined$grid_id))  # Progress for unique grid IDs
+#   
+#   result <- dt_joined[, .(
+#     Food_Beverage = as.integer(any(retail_category == "Food & Beverage", na.rm = TRUE)),
+#     Convenience_Goods = as.integer(any(retail_category == "Convenience Goods", na.rm = TRUE)),
+#     Entertainment_Leisure = as.integer(any(retail_category == "Entertainment and Leisure", na.rm = TRUE)),
+#     geometry = geometry[1]  # Fast way to retain geometry
+#   ), by = .(grid_id)]
+#   
+#   p()  # Update progress
+#   
+#   st_as_sf(result)  # Convert back to sf
+# })
+
+
+dat_grid_final <- with_progress({
+  p <- progressor(along = unique(dt_joined$grid_id))  # Progress for unique grid IDs
+  
+  result <- dt_joined[, .(
+    Food_Retail = as.integer(any(retail_category %in% c("Food & Beverage", "Convenience Goods", "Entertainment and Leisure"), na.rm = TRUE)),
+    geometry = geometry[1]  # Retain one geometry per grid cell
+  ), by = .(grid_id)]
+  
+  p()  # Update progress
+  
+  st_as_sf(result)  # Convert back to sf
+})
+
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = factor(Food_Retail)), color = NA) +  # Remove borders
+  scale_fill_manual(values = c("0" = "gray90", "1" = "red")) +
+  theme_minimal() +
+  labs(title = "Food & Beverage Locations", fill = "Presence")
