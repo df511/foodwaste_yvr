@@ -1,0 +1,385 @@
+---
+title: "Homework2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+## Started 4 March 2025
+## by Daniel Forrest ##
+
+rm(list=ls()) 
+options(stringsAsFactors = FALSE)
+```
+
+```{r}
+library(rstan)
+library(here)
+library(haven)
+library(shinystan)
+
+here()
+```
+### explore empirical data
+```{r}
+## read empirical data
+load(file = here("data", "dat_fw_demo_lc_retail_shelters_750.Rdata"))
+```
+## simulate data and create first model
+```{r}
+### explore empirical data
+
+
+summary(dat_grid_final$fw_score)
+
+ggplot(dat_grid_final, aes(x = fw_score)) +
+  geom_density(fill = "blue", alpha = 0.6) +  # Adjust color and transparency
+  theme_minimal() +
+  labs(title = "Density Plot of FW Score",
+       x = "FW Score",
+       y = "Density")
+
+
+# Calculate the number of zeros in your variable (e.g., fw_score)
+num_zeros <- sum(dat_grid_final$fw_score == 0)
+
+# Calculate the total number of observations
+total_obs <- nrow(dat_grid_final)
+
+# Calculate the proportion of zeros
+proportion_zeros <- num_zeros / total_obs
+
+# Print the result
+proportion_zeros
+
+```
+```{r}
+### simulate data
+
+set.seed(42)  # For reproducibility
+
+# Parameters
+n <- 1000              # Number of observations
+p_zero <- 0.86          # Probability of zero inflation (40% zeros)
+mu <- 5                # Mean for Negative Binomial distribution
+size <- 2              # Dispersion parameter for Negative Binomial
+
+# 1. Generate Zero-Inflation Component (Bernoulli)
+zero_inflation <- rbinom(n, 1, p_zero)
+
+# 2. Generate Non-Zero Data from Negative Binomial (for non-zero inflation cases)
+non_zero_data <- rnbinom(n, size = size, mu = mu)
+
+# 3. Combine both components to create the final ZINB data
+zinb_data <- ifelse(zero_inflation == 1, 0, non_zero_data)
+
+# Check the distribution of simulated data
+hist(zinb_data, breaks = 30, main = "Simulated Zero-Inflated Negative Binomial Data", 
+     xlab = "Value", col = "skyblue")
+
+
+### made up species codes
+#species_codes <- c("Ccon", "Easp", "Bxyz", "Pqrs", "Mnop", "Qrst", "Abcd", "Efgh", 
+#                   "Ijkl", "Uvwx", "Yzab", "Klmn", "Opqr", "Stuv", "Wxyz", "Xyza")
+# Generate a random vector of 565 values
+set.seed(123) # Set seed for reproducibility
+
+#N = 565
+Nspp = 16
+#species <- sample(species_codes, size = N, replace = TRUE)
+#individ <- c(1:N)
+
+individs_per_spp <- round(runif(Nspp, 20, 30)) ### determines number of individuals per species
+species <- rep(1:Nspp, individs_per_spp) ## creates vector of species code for each individual in sp. group
+N <- length(species) ### length of species vector (# of individuals)
+
+individ <- rep(NA, N)
+
+### loop to create a sequence of individual per species, 1 through individs_per_spp
+for (sp in 1:Nspp){
+  individ[species==sp] <- 1:(individs_per_spp[sp])
+}
+
+mu_a <- rnorm(1, 16, 8)
+sigma_a <- rnorm(1, 8, 4)
+mu_b <- rnorm(1, 1, 0.5) 
+sigma_b <- rnorm(1, 0.5, 0.25)
+sigma_y <- rnorm(1, 20, 10)
+wetmass <- rnorm(individ, mean = 15, sd = 15)
+
+alphaspp <- rnorm(Nspp, mu_a, sigma_a)
+slopespp <- rnorm(Nspp, mu_b, sigma_b)
+
+paramsgiven <- c(mu_a, sigma_a, mu_b, sigma_b, sigma_y)
+
+
+ypred <- length(Nspp)
+
+for (n in 1:N){
+  sp <- species[n]
+  ypred[n] <- alphaspp[sp] + slopespp[sp]*wetmass[n]
+}
+
+y <- rnorm(N, ypred, sigma_y)
+
+hist(y)
+
+plot.new()
+par(mfrow=c(3,2))
+
+plot(c(0,50), c(0,50), type = "n", xlab = "x", ylab = "y", asp = 1, xlim = c(0, 50))
+for (s in 1:sp) {
+  abline(a=alphaspp[s], b = slopespp[s])
+}
+
+
+## Fit Stan model to your test data 
+
+fit <- stan(here("src", "twolevelhierslopeint.stan"), data=c("N","y","Nspp","species","wetmass"), iter=1000, chains=4, seed=377)
+
+# grep stan output
+sumer <- summary(fit)$summary
+muparams <- sumer[grep("mu", rownames(sumer)), c("mean", "2.5%", "25%", "50%", "75%", "97.5%")]
+sigmaparams <- sumer[grep("sigma", rownames(sumer)), c("mean", "2.5%","25%", "50%", "75%", "97.5%")]
+
+# compare given versus modeled
+paramsgiven # here's the parameters we set
+muparams # estimated mu parameters
+sigmaparams # estimate sigma parameters
+
+spslopes <- sumer[grep("b\\[", rownames(sumer)), "mean"]
+
+plot(spslopes~slopespp, xlab="Given species-level slopes", ylab="Modeled species-level slopes", col="darkblue")
+abline(0,1)
+
+
+
+# 
+# #### thinking through model format
+# ### speed ~ a[sp] + B1[sp[i]]X1[i] + B2[sp[i]]X2[i] + B3[sp[i]]X3[i]  
+# 
+# wetmass <- rnorm(565, mean = 15, sd = 15)
+# speed <- rnorm(565, mean = 16, sd = 10)
+# swimbeat <- rnorm(565, mean = 45, sd = 20)
+# tailamp <- rnorm(565, mean = 45, 25)
+# ldh <- rnorm(565, mean = -3, sd = 2)
+# pk <- rnorm(565, mean = -6, sd = 4)
+# ak <- rnorm(565, mean = 6, sd = 6)
+# area <- rnorm(565, mean = 4, sd = 4)
+# perim <- rnorm(565, mean = 10, sd = 5)
+# majaxis <- rnorm(565, mean = 5, sd = 3)
+# breadth <- rnorm(565, mean = 1, sd = 1)
+# 
+# sim_dat <- data.frame(species, individ, wetmass, speed, swimbeat,tailamp, ldh, pk, ak, area, perim, majaxis, breadth)
+
+```
+### explore priors
+```{r}
+par(mfrow=c(3,2))
+hist(rnorm(5000, 16,8), main="Intercept mean prior", col="lightblue")
+hist(rnorm(5000,8,4), main = "Intercept variance prior", col = "lightblue")
+hist(rnorm(5000, 1, 0.5), main="Slope wetmass prior", col="lightblue")
+hist(rnorm(5000,0.5,0.25), main = "Slope wetmass variance prior", col = "lightblue")
+hist(rnorm(5000,20,10), main = "response variance prior", col = "lightblue")
+#segments(-10,25,0,25, lwd=5, col="darkblue")
+```
+
+
+# ```{r}
+# # Let's check what the predicted slopes look like
+# # Iterating over mu and sigma for intercepts and slopes
+# reps <- 12
+# mu_b <- rnorm(reps, 1,0.5)
+# sigma_b <- rtruncnorm(a=0, b=Inf, reps, 0, 20)
+# mu_shift <- rnorm(reps, 0,5)
+# sigma_shift <- rtruncnorm(a=0, b=Inf, reps, 0,15)
+# 
+# par(mfrow=c(3,4))
+# par(mar=c(3,3,1,1), mgp=c(1.5,.5,0), tck=-.01)
+# for(i in 1:reps){
+#     plot(range(year), range(y), xlab="Year", ylab="Day of year",
+#         xlim=c(-50,40),ylim=c(-50,400), type="n")
+#     species_doy <- rnorm(Nspp, mu_doy[i], sigma_doy[i])
+#     species_trend <- rnorm(Nspp, mu_shift[i], sigma_shift[i])
+#     for(sp in 1:Nspp){
+#         abline(species_doy[sp], species_trend[sp], col="lightblue")
+#     }
+#     abline(mu_doy[i], mu_shift[i], col="darkblue")
+# }
+# ```
+
+
+#### perform retrodictive checks
+
+
+```{r}
+
+posterior_samples <- extract(fit)
+# Extract parameters
+alpha_samples <- posterior_samples$a
+beta_samples <- posterior_samples$b
+sigma_samples <- posterior_samples$sigma_y
+
+# Generate posterior predictive draws
+y_rep <- matrix(NA, nrow = length(alpha_samples), ncol = N)  # Rows = draws, columns = observations
+
+# Loop over posterior samples
+for (i in 1:nrow(alpha_samples)) {  # Each row is an iteration
+  for (n in 1:N) {
+    sp <- species[n]  # Species ID for this individual
+    y_pred <- alpha_samples[i, sp] + beta_samples[i, sp] * wetmass[n]
+    y_rep[i, n] <- rnorm(1, y_pred, sigma_samples[i])  # Simulate using posterior sigma
+  }
+}
+
+hist(y, probability = TRUE, main = "Posterior Predictive Check", xlab = "y", col = "lightblue", border = "white")
+for (i in 1:100) {
+  lines(density(y_rep[i, ]), col = rgb(1, 0, 0, 0.1))
+}
+```
+
+```{r}
+mean_observed <- mean(y)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+
+```
+```{r}
+library(bayesplot)
+
+# Convert y_rep to the required format
+ppc_dens_overlay(y, y_rep[1:100, ])  # Overlay densities of observed and simulated data
+```
+
+```{r}
+col_means <- colMeans(y_rep, na.rm = TRUE) 
+residuals <- y - col_means  # Compute residuals
+residuals <- residuals[is.finite(residuals)]  # Remove non-finite values
+
+# Plot residuals
+if (length(residuals) > 0) {
+  plot(residuals, main = "Residuals", ylab = "Residuals", xlab = "Index")
+  abline(h = 0, col = "red")
+} else {
+  message("No finite residuals to plot.")
+}
+
+```
+
+
+### create model on empirical data
+
+```{r}
+### construct empirical data
+
+### made up species codes
+#species_codes <- c("Ccon", "Easp", "Bxyz", "Pqrs", "Mnop", "Qrst", "Abcd", "Efgh", 
+#                   "Ijkl", "Uvwx", "Yzab", "Klmn", "Opqr", "Stuv", "Wxyz", "Xyza")
+# Generate a random vector of 565 values
+set.seed(123) # Set seed for reproducibility
+
+fastswim <- fastswim[!is.na(fastswim$speed),]
+
+Nspp = 16
+species <- as.integer(as.factor(fastswim$species))
+N <- length(species)
+individ <- c(1:N)
+wetmass <- fastswim$wetmass
+
+mu_a <- rnorm(1, 16, 8)
+sigma_a <- rnorm(1, 8, 4)
+mu_b <- rnorm(1, 1, 0.5) 
+sigma_b <- rnorm(1, 0.5, 0.25)
+sigma_y <- rnorm(1, 20, 10)
+
+alphaspp <- rnorm(Nspp, mu_a, sigma_a)
+slopespp <- rnorm(Nspp, mu_b, sigma_b)
+
+paramsgiven <- c(mu_a, sigma_a, mu_b, sigma_b, sigma_y)
+
+
+y <- fastswim$speed
+
+
+## Fit Stan model to your test data 
+
+fit_empirical <- stan(here("src", "twolevelhierslopeint.stan"), data=c("N","y","Nspp","species","wetmass"), iter=1000, chains=4, seed=377)
+
+# grep stan output
+sumer <- summary(fit)$summary
+muparams <- sumer[grep("mu", rownames(sumer)), c("mean", "2.5%", "25%", "50%", "75%", "97.5%")]
+sigmaparams <- sumer[grep("sigma", rownames(sumer)), c("mean", "2.5%","25%", "50%", "75%", "97.5%")]
+
+# compare given versus modeled
+paramsgiven # here's the parameters we set
+muparams # estimated mu parameters
+sigmaparams # estimate sigma parameters
+
+spslopes <- sumer[grep("b\\[", rownames(sumer)), "mean"]
+
+plot(spslopes~slopespp, xlab="Given species-level slopes", ylab="Modeled species-level slopes", col="darkblue")
+abline(0,1)
+
+
+```
+
+## perform posterior predictive checks
+```{r}
+
+posterior_samples <- extract(fit_empirical)
+# Extract parameters
+alpha_samples <- posterior_samples$a
+beta_samples <- posterior_samples$b
+sigma_samples <- posterior_samples$sigma_y
+
+# Generate posterior predictive draws
+y_rep <- matrix(NA, nrow = length(alpha_samples), ncol = N)  # Rows = draws, columns = observations
+
+# Loop over posterior samples
+for (i in 1:nrow(alpha_samples)) {  # Each row is an iteration
+  for (n in 1:N) {
+    sp <- species[n]  # Species ID for this individual
+    y_pred <- alpha_samples[i, sp] + beta_samples[i, sp] * wetmass[n]
+    y_rep[i, n] <- rnorm(1, y_pred, sigma_samples[i])  # Simulate using posterior sigma
+  }
+}
+
+hist(y, probability = TRUE, main = "Posterior Predictive Check", xlab = "y", col = "lightblue", border = "white")
+for (i in 1:100) {
+  lines(density(y_rep[i, ]), col = rgb(1, 0, 0, 0.1))
+}
+```
+```{r}
+mean_observed <- mean(y)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+```{r}
+
+# Convert y_rep to the required format
+ppc_dens_overlay(y, y_rep[1:100, ])  # Overlay densities of observed and simulated data
+```
+
+
+```{r}
+col_means <- colMeans(y_rep, na.rm = TRUE) 
+residuals <- y - col_means  # Compute residuals
+residuals <- residuals[is.finite(residuals)]  # Remove non-finite values
+
+# Plot residuals
+if (length(residuals) > 0) {
+  plot(residuals, main = "Residuals", ylab = "Residuals", xlab = "Index")
+  abline(h = 0, col = "red")
+} else {
+  message("No finite residuals to plot.")
+}
+```
+
+## Given the above plots, I believe we've attained a decent fit. Yet, our residuals are fairly large, meaning we have some unaccounted for variance. Given that we have several additional measured variables, we could go back and consider whether other predictors may be of importance. However, we have learned that mass (alone) IS a decent predictor of swimming speed. I think the additional variance is likely due to a number of different morphological and/or physiological variables. Therefore, I'd include some of the these vars in the next model.

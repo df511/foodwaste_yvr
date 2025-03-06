@@ -31,8 +31,8 @@ library(progressr)
 #### The following script is divided into modules, depending on the data type and intended output, 
 #### so as to reduce run time, repeat operations, and organize by source data
 #### If you are running for the first time, set all of the following params to TRUE
-#### IF you are running to only alter part of the data generating operation,
-#### set the stages prior to the stage 
+#### If you are running to only alter part of the data generating operation,
+#### set all stages prior to the focal stage to FALSE
 
 ### Module 1: gen grids
 gen_grids <- TRUE  # Change to FALSE to load data instead
@@ -40,11 +40,12 @@ gen_grids <- TRUE  # Change to FALSE to load data instead
 gen_foodwaste <- TRUE  # Change to FALSE to load data instead
 ### Module 3: gen Canadian census dat (demographics)
 gen_demog <- TRUE  # Change to FALSE to load data instead
-### Module 4: read in land cover data, calculate proportion of cell containing eahc of 13 land cover classes
+### Module 4: read in land cover data, calculate proportion of cell containing each of 13 land cover classes
 gen_lc <- TRUE
 ### Module 5: read in food retail location data
 gen_foodretail <- TRUE
-
+### Module 6: read in food retail location data
+gen_shelters <- TRUE
 
 #########################################################################################################
 ############ Module 1: generate grids ###########################
@@ -84,7 +85,7 @@ create_internal_grid <- function(polygon, cell_size) {
 ###### read files
 
 lancaster <- st_read(here("data","sites","lancaster_sites.kml"))
-weber <- st_read(here("data","sites","weber_sites.kml"))
+weber <- st_read(here("data","sites","weber_site_edits.kml"))
 weber_rep <- weber[1:3,] ## Weber sites I visited and surveyed (drop one outside of CoV borders)
 plot(weber_rep) # check 
 weber_lancaster <- do.call(rbind, list(lancaster, weber_rep))
@@ -199,9 +200,11 @@ dat <- dat[!grepl("_spot", site)]
 #### Fix data entry error
 #Identify the row number where the shift should occur
 row_num <- 5375  
+
 # Perform the shift #not performing as expected yet. 
-dat[row_num, `:=`(fl_density = bin_count,
-                  bin_contents = shift(dat[row_num, bin_contents], type = "lead"))]
+#dat[row_num, `:=`(fl_density = bin_count,
+#                  bin_contents = shift(dat[row_num, bin_contents], type = "lead"))]
+
 
 # Function to convert columns from character to numeric
 convert_to_numeric <- function(col) {
@@ -376,7 +379,18 @@ census_data$black_percent <- census_data$black_pop / census_data$population
 census_data$indig_percent <- census_data$indig_pop / census_data$population
 census_data$min_percent <- census_data$minority_pop / census_data$population
 
-census_data <- census_data[, -c(2, 4, 5:7,9, 11:13)]  # Drops columns 2, 5, and 7
+census_data <- census_data[, -c(2, 4,6,7,9, 11:13)]  # Drops columns 2, 5, and 7
+
+MSDI <- read_excel(here("data","raw", "INDQ_MSDI_Canada", "A-MSDIData_Can2021_en", "1. EquivalenceTableCanada2021_en.xlsx"))
+
+# Filter the dataframe
+MSDI_yvr <- MSDI %>% 
+  filter(MUNIC == "5915022")
+
+MSDI_yvr <- MSDI_yvr %>% mutate(DA = as.character(DA))
+
+census_data <- census_data %>%
+  left_join(MSDI_yvr %>% select(DA, SCOREMAT, SCORESOC), by = c("name" = "DA"))
 
 
 census_data <- st_transform(census_data, st_crs(dat_grid)) ### ensure the same CRS
@@ -426,6 +440,8 @@ save(dat_grid, file = here("data","dat_fw_demo_lc_750.Rdata"))
 }
 
 
+
+
 #########################################################################################################
 ############## Module 5: read in food retail location data #################
 
@@ -442,6 +458,7 @@ stores$latitude <- stores$geo_point_2d$lat
 ### Convert to sf object
 stores_sf <- st_as_sf(stores, coords = c("longitude", "latitude"), crs = 4326)
 ### filter to only food related businesses
+unique(stores_sf$retail_category)
 categories <- c("Food & Beverage", "Convenience Goods", "Entertainment and Leisure")
 
 # Filter the sf dataframe
@@ -461,11 +478,20 @@ ggplot(data = food_stores) +
   labs(title = "Retail Store Categories")
 
 
+######## food vendors
+
+### Read vendors file, metadata available here: https://opendata.vancouver.ca/explore/dataset/food-vendors/information/
+vendors <- fromJSON(here("data","raw" ,"food-vendors.json"))
+
+### Extract lat/lon from the nested column
+vendors$longitude <- vendors$geo_point_2d$lon
+vendors$latitude <- vendors$geo_point_2d$lat
+### Convert to sf object
+vendors_sf <- st_as_sf(vendors, coords = c("longitude", "latitude"), crs = 4326)
+
+
 ## object called "dat_grid"
 load(file = here("data", "dat_fw_demo_lc_750.Rdata"))
-unique(food_stores$retail_category)
-head(food_stores)
-
 
 food_stores <- food_stores %>%
   mutate(
@@ -480,14 +506,51 @@ food_stores <- st_transform(food_stores, st_crs(dat_grid))
 
 
 
+vendors_sf <- vendors_sf %>%
+  mutate(
+    lon = geo_point_2d$lon,
+    lat = geo_point_2d$lat
+  ) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 3857)
+vendors_sf <- st_transform(vendors_sf, st_crs(dat_grid))
+
+vendors_sf <- vendors_sf %>%
+  rename(retail_category = vendor_type)
+
+vendors_sf <- vendors_sf[, -c(1,3,5:9,12)]
+vendors_sf$year_recorded <- "2020"
+
+food_stores <- bind_rows(food_stores, vendors_sf)
+
+
+
+lowcost_food <- fromJSON(here("data","raw" ,"free-and-low-cost-food-programs.json"))
+lowcost_food <- lowcost_food[!is.na(lowcost_food$latitude),]
+### Convert to sf object
+lowcost_food_sf <- st_as_sf(lowcost_food, coords = c("longitude", "latitude"), crs = 4326)
+lowcost_food_sf <- lowcost_food_sf %>%
+  mutate(lon = st_coordinates(.)[,1],  # X = longitude
+         lat = st_coordinates(.)[,2])  # Y = latitude
+lowcost_food_sf <- st_transform(lowcost_food_sf, st_crs(dat_grid))
+
+lowcost_food_sf$retail_category <- "free_lowcost_food"
+lowcost_food_sf <- lowcost_food_sf %>%
+  rename(business_name = program_name)
+
+lowcost_food_sf  <- lowcost_food_sf  %>%
+  mutate(year = substr(as.character(last_update_date), 1, 4)) %>%  # Extract year
+  select(-last_update_date)  # Optionally drop original column
+
+lowcost_food_sf  <- lowcost_food_sf[, c(1,24:28)]
+
+food_stores <- bind_rows(food_stores, lowcost_food_sf)
+
 # Perform spatial join: Assigns food store points to grid cells
 joined <- st_join(dat_grid, food_stores, left = TRUE) 
 
 
-
 # Enable progress bar
 handlers(global = TRUE)
-
 
 # Convert to data.table
 dt_joined <- as.data.table(joined)
@@ -495,35 +558,7 @@ dt_joined <- as.data.table(joined)
 # Convert `retail_category` to a factor for faster comparison
 dt_joined[, retail_category := as.factor(retail_category)]
 
-# # Perform grouped aggregation
-# dat_grid_final <- with_progress({
-#   p <- progressor(along = unique(dt_joined$grid_id))  # Progress for unique grid IDs
-#   
-#   result <- dt_joined[, .(
-#     Food_Beverage = as.integer(any(retail_category == "Food & Beverage", na.rm = TRUE)),
-#     Convenience_Goods = as.integer(any(retail_category == "Convenience Goods", na.rm = TRUE)),
-#     Entertainment_Leisure = as.integer(any(retail_category == "Entertainment and Leisure", na.rm = TRUE)),
-#     geometry = geometry[1]  # Fast way to retain geometry
-#   ), by = .(grid_id)]
-#   
-#   p()  # Update progress
-#   
-#   st_as_sf(result)  # Convert back to sf
-# })
 
-
-# dat_grid_final <- with_progress({
-#   p <- progressor(along = unique(dt_joined$grid_id))  # Progress for unique grid IDs
-#   
-#   result <- dt_joined[, .(
-#     Food_Retail = as.integer(any(retail_category %in% c("Food & Beverage", "Convenience Goods", "Entertainment and Leisure"), na.rm = TRUE)),
-#     geometry = geometry[1]  # Retain one geometry per grid cell
-#   ), by = .(grid_id)]
-#   
-#   p()  # Update progress
-#   
-#   st_as_sf(result)  # Convert back to sf
-# })
 
 dat_grid_final <- with_progress({
   p <- progressor(along = unique(dt_joined$grid_id))  # Progress for unique grid IDs
@@ -539,9 +574,14 @@ dat_grid_final <- with_progress({
   result <- merge(dt_joined, food_grids, by = "grid_id", all.x = TRUE)
   
   st_as_sf(result)  # Convert back to sf
+  
 })
 
-dat_grid_final <- dat_grid_final[,-c(44:48)]
+dat_grid_final <- dat_grid_final[,-c(44:49)]
+
+#### gen nearest food retailer column
+dat_grid_final <- dat_grid_final %>%
+  mutate(nearest_food_retail = apply(st_distance(geometry, food_stores), 1, min))
 
 ### test plot
 ggplot(dat_grid_final) +
@@ -549,4 +589,43 @@ ggplot(dat_grid_final) +
   scale_fill_manual(values = c("0" = "gray90", "1" = "red")) +
   theme_minimal() +
   labs(title = "Food & Beverage Locations", fill = "Presence")
+
+save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_750.Rdata"))
+
+
+
+} else {
+  ## object called "dat_grid"
+  load(file = here("data", "dat_fw_demo_lc_retail_750.Rdata"))
+}
+
+
+#########################################################################################################
+############## Module 6: read in nearest homeless shelter #################
+
+if (gen_shelters) {
+### data sourced from: https://opendata.vancouver.ca/explore/dataset/homeless-shelter-locations/information/
+shelters <- st_read(here("data","raw","homeless-shelter-locations"))
+
+shelters <- shelters %>%
+  mutate(lon = st_coordinates(.)[,1],  # X = longitude
+         lat = st_coordinates(.)[,2])  # Y = latitude
+shelters <- st_transform(shelters, st_crs(dat_grid_final))
+
+
+shelters$year <- "2025"
+
+shelters <- shelters[, c(1,9:11)]
+
+# Compute the minimum distance from each grid cell to the nearest shelter
+dat_grid_final <- dat_grid_final %>%
+  mutate(nearest_shelter_dist = apply(st_distance(geometry, shelters), 1, min))
+save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_750.Rdata"))
+
+
+} else {
+  ## object called "dat_grid"
+  load(file = here("data", "dat_fw_demo_lc_retail_shelters_750.Rdata"))
+}
+
 

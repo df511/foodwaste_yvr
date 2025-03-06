@@ -132,8 +132,9 @@ dat_sf <- st_as_sf(dat, sf_column_name = "geometry")
 
 
 # Plot the spatial geometries color-coded by bin_form
-ggplot(dat_sf) +
-  geom_sf(aes(color = bin_form)) +
+ggplot() +
+  geom_sf(data = sites_3857, aes(color = "yellow")) +
+  geom_sf(data= dat_sf, aes(color = bin_form)) +
   theme_minimal() +
   labs(title = "Spatial Geometries Color-coded by Bin Form",
        color = "Bin Form")
@@ -241,10 +242,10 @@ dat_grid <- dat_grid %>%
 save(dat_grid, file = here("data","dat_grid_25.Rdata"))
 
 # Define output file name and resolution
-pdf(here("figs","food_waste_score_map.pdf"), width = 80, height = 64)  # Adjust size as needed
+pdf(here("figs","food_waste_score_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
 
 ggplot(dat_grid) +
-  geom_sf(aes(fill = log(total_weighted_value)), color = NA) +  # No borders for a smooth heatmap
+  geom_sf(aes(fill = log(fw_score)), color = NA) +  # No borders for a smooth heatmap
   scale_fill_viridis_c(option = "inferno", name = "Weighted Value") +  # "inferno" for bright-darker range
   theme_minimal() +
   theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
