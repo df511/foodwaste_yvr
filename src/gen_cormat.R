@@ -44,18 +44,16 @@ my_data <- my_data[, -c(1,5,48)]
 
 my_data <- na.omit(my_data)
 
-
-for (val in 1:47) {
-  print(val)
-  print(class(my_data[,val]))
-}
-
-
+# 
+# for (val in 1:47) {
+#   print(val)
+#   print(class(my_data[,val]))
+# }
+# 
+# 
 cormat <- cor(my_data)
 
 
-colnames(cormat) <- labels
-rownames(cormat) <- labels
 cormat <- reorder_cormat(cormat)
 lower_tri <- get_lower_tri(cormat)
 melted_cormat <- melt(lower_tri)
