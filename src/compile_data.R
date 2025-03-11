@@ -577,7 +577,7 @@ dat_grid_final <- with_progress({
   
 })
 
-dat_grid_final <- dat_grid_final[,-c(44:49)]
+dat_grid_final <- dat_grid_final[,-c(47:52)]
 
 #### gen nearest food retailer column
 dat_grid_final <- dat_grid_final %>%
@@ -624,7 +624,7 @@ save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_750.Rdat
 
 
 } else {
-  ## object called "dat_grid"
+  ## object called "dat_grid_final"
   load(file = here("data", "dat_fw_demo_lc_retail_shelters_750.Rdata"))
 }
 
