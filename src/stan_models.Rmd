@@ -19,6 +19,7 @@ library(rstan)
 library(here)
 library(haven)
 library(shinystan)
+library(ggplot2)
 
 here()
 ```
@@ -55,6 +56,93 @@ proportion_zeros <- num_zeros / total_obs
 proportion_zeros
 
 ```
+```{r}
+set.seed(123)  # For reproducibility
+
+
+n <- length(dat_grid_final$fw_score)  # Sample size
+
+# True coefficients
+a <- 0.5    # Intercept
+B1 <- 0.3   # Coefficient for X1
+B2 <- -0.5  # Coefficient for X2
+dispersion <- 3  # Overdispersion parameter (sigma^2)
+
+# Generate predictor variables
+
+X1 <- rbeta(n, shape1 = 0.8, shape2 = 2.5) * 0.6 + 0.1  # Rescale to 0.1-0.7
+X2<- rnbinom(n, mu = 400, size = 1/0.5)
+
+# Compute expected counts (linear predictor)
+yhat <- exp(a + B1 * X1 + B2 * X2)  # Convert to positive scale
+
+# Simulate response variable (Negative Binomial)
+y <- rnbinom(n, mu = yhat, size = 1 / dispersion)  
+
+
+```
+
+
+```{r}
+set.seed(123)  # For reproducibility
+
+n <- length(dat_grid_final$fw_score)  # Sample size
+
+# True coefficients
+a <- 0.5    # Intercept
+B1 <- 0.3   # Coefficient for X1
+B2 <- -0.005  # Smaller effect for X2 to prevent over-suppression
+dispersion <- 2  # Reduced overdispersion for more variation
+
+
+# Generate predictor variables
+X1 <- rbeta(n, shape1 = 0.8, shape2 = 2.5) * 0.6 + 0.1  # Rescale to 0.1-0.7
+X2 <- rnbinom(n, mu = 50, size = 1/0.5)
+
+# Compute expected counts (linear predictor)
+yhat <- exp(a + B1 * X1 + B2 * X2)  # Convert to positive scale
+
+# Simulate response variable (Negative Binomial)
+y_nonzero <- rnbinom(n, mu = yhat, size = 1 / dispersion) 
+
+# Introduce ~86% zeros explicitly
+zero_prob <- 0.83
+is_zero <- rbinom(n, size = 1, prob = zero_prob)  # 1 = zero, 0 = keep y_nonzero
+
+y <- ifelse(is_zero == 1, 0, y_nonzero)  # Apply zero inflation
+
+# Ensure values are within range
+y <- pmin(y, 5)  # Cap at 5 if necessary
+
+# Check distribution
+hist(y, breaks = 20, main = "Simulated Zero-Inflated Negative Binomial Data", col = "blue")
+mean(y == 0)  # Should be ~86%
+
+```
+
+
+```{r}
+# Check the distribution of simulated data
+hist(y, breaks = 50, main = "Simulated food waste scores", 
+     xlab = "Value", col = "skyblue")
+```
+
+
+```{r}
+sim_data <- data.frame(y, X1, X2 = factor(X2))
+head(sim_data)
+
+```
+```{r}
+ggplot(sim_data, aes(x = X1, y = y, color = X2)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = "quasipoisson"), se = FALSE) +
+  theme_minimal() +
+  labs(title = "Simulated Negative Binomial Data", x = "X1", y = "Count (y)")
+
+```
+
+
 ```{r}
 ### simulate data
 

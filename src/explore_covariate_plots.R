@@ -28,14 +28,21 @@ dat_scaled <- dat_clean %>%
 
 
 # Define variable name
-var <- "chinese_pct"
-
+var1 <- "nearest_food_retail"
+var2 <- "chinese_pct"
 
 # Dynamically reference the variable
 #model <- lm(as.formula(paste("fw_score ~", var)), data = dat_scaled)
 model <- lm(as.formula(paste("fw_score ~",var)), data = dat_scaled)
 
+model <- glm(fw_score ~ nearest_food_retail + chinese_pct + rent_pct + female_pct + nearest_shelter_dist, data = dat_scaled)
 
+
+model <- glm(fw_score ~ chinese_pct + nearest_food_retail, data = dat_scaled)
+
+
+var <- "nearest_food_retail"
+model <- lm(as.formula(paste("fw_score ~",var)), data = dat_scaled)
 # Extract equation components dynamically
 eq <- as.expression(
   substitute(italic(y) == a + b %.% italic(x) * "," ~~ R^2 ~ "=" ~ r2 * "," ~~ p ~ "=" ~ pval, 
@@ -60,4 +67,36 @@ ggplot(dat_scaled, aes_string(x = var, y = "fw_score")) +
 
 
 
+
+
+# Define variable name
+var1 <- "renters"
+var2 <- "household_income"
+
+# Dynamically reference the variable
+#model <- lm(as.formula(paste("fw_score ~", var)), data = dat_scaled)
+model <- lm(as.formula(paste(var2, "~",var1)), data = dat_scaled)
+
+
+# Extract equation components dynamically
+eq <- as.expression(
+  substitute(italic(y) == a + b %.% italic(x) * "," ~~ R^2 ~ "=" ~ r2 * "," ~~ p ~ "=" ~ pval, 
+             list(a = round(coef(model)[1], 6), 
+                  b = round(coef(model)[2], 6), 
+                  r2 = round(summary(model)$r.squared, 3), 
+                  pval = signif(summary(model)$coefficients[2, 4], 3)))
+)
+
+# Plot with dynamically updated labels
+ggplot(dat_scaled, aes_string(x = var2, y = var1)) +
+  geom_point(alpha = 0.6, color = "blue") +  
+  geom_smooth(method = "lm", formula = y ~ x, color = "red", se = FALSE) +  
+  annotate("text", 
+           x = max(dat_scaled[[var2]], na.rm = TRUE) * 0.4, 
+           y = max(dat_scaled[[var1]], na.rm = TRUE) * 0.4, 
+           label = eq, hjust = 0, parse = TRUE)+ 
+  theme_minimal() +
+  labs(title = paste(var2, "vs.", var1),
+       y =  var1,
+       x = var2)
 

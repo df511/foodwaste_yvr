@@ -60,6 +60,8 @@ unique(food_stores$retail_category)
 head(food_stores)
 
 
+
+
 ggplot() +
   # Plot food store points
   geom_sf(data = food_stores, aes(color = retail_category, fill = retail_category), 
@@ -121,9 +123,10 @@ vendors_sf$year_recorded <- "2020"
 food_stores <- bind_rows(food_stores, vendors_sf)
 
 
+st_write(food_stores, driver='kml', dsn = here("data","food_stores.kml"), append =FALSE)
+
 # Perform spatial join: Assigns food store points to grid cells
 joined <- st_join(dat_grid, food_stores, left = TRUE) 
-
 
 
 # Enable progress bar
@@ -135,6 +138,8 @@ dt_joined <- as.data.table(joined)
 
 # Convert `retail_category` to a factor for faster comparison
 dt_joined[, retail_category := as.factor(retail_category)]
+
+
 
 
 
@@ -155,6 +160,8 @@ dat_grid_final <- with_progress({
 })
 
 dat_grid_final <- dat_grid_final[,-c(44:48)]
+
+dat_grid_final[food_stores]
 
 ### test plot
 ggplot(dat_grid_final) +
@@ -237,6 +244,8 @@ ggplot() +
 ggplot(data = farmers_markets$markettype) +
   theme_minimal() +
   labs(title = "Food & Beverage Locations", fill = "Presence")
+
+
 
 
 

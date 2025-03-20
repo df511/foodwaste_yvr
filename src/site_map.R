@@ -200,3 +200,32 @@ income_map
 ggsave(here("figs","income_map.pdf"), dpi = 600, scale = 2)
 
 hist(census_data$household_income, breaks = 30)
+
+
+
+
+
+lowrise_map  <- ggplot() + geom_sf(data = census_data, aes(fill = low_rise)) + 
+  scale_fill_viridis(direction = -1)  + 
+  geom_sf(data = sites, color = 'black', fill = NA, lwd = 1) +
+  scale_y_continuous(breaks = seq(49.2, 49.34, by = 0.025)) + 
+  scale_x_continuous(breaks = seq(-123.25, -123, by = 0.05))
+
+lowrise_map
+
+highrise_map  <- ggplot() + geom_sf(data = census_data, aes(fill = high_rise)) + 
+  scale_fill_viridis(direction = -1)  + 
+  geom_sf(data = sites, color = 'black', fill = NA, lwd = 1) +
+  scale_y_continuous(breaks = seq(49.2, 49.34, by = 0.025)) + 
+  scale_x_continuous(breaks = seq(-123.25, -123, by = 0.05))
+
+highrise_map
+
+
+highrise_map  <- ggplot() + geom_sf(data = census_data, aes(fill = high_rise)) + 
+  scale_fill_viridis(direction = -1)  + 
+  geom_sf(data = sites, color = 'black', fill = NA, lwd = 1) +
+  scale_y_continuous(breaks = seq(49.2, 49.34, by = 0.025)) + 
+  scale_x_continuous(breaks = seq(-123.25, -123, by = 0.05))
+
+highrise_map
