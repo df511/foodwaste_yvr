@@ -61,7 +61,7 @@ proportion_zeros
 set.seed(42)  # For reproducibility
 
 # Parameters
-n <- 1000              # Number of observations
+n <- 3000              # Number of observations
 p_zero <- 0.86          # Probability of zero inflation (40% zeros)
 mu <- 5                # Mean for Negative Binomial distribution
 size <- 2              # Dispersion parameter for Negative Binomial
@@ -76,31 +76,10 @@ non_zero_data <- rnbinom(n, size = size, mu = mu)
 zinb_data <- ifelse(zero_inflation == 1, 0, non_zero_data)
 
 # Check the distribution of simulated data
-hist(zinb_data, breaks = 30, main = "Simulated Zero-Inflated Negative Binomial Data", 
+hist(zinb_data, breaks = 50, main = "Simulated Zero-Inflated Negative Binomial Data", 
      xlab = "Value", col = "skyblue")
 
 
-### made up species codes
-#species_codes <- c("Ccon", "Easp", "Bxyz", "Pqrs", "Mnop", "Qrst", "Abcd", "Efgh", 
-#                   "Ijkl", "Uvwx", "Yzab", "Klmn", "Opqr", "Stuv", "Wxyz", "Xyza")
-# Generate a random vector of 565 values
-set.seed(123) # Set seed for reproducibility
-
-#N = 565
-Nspp = 16
-#species <- sample(species_codes, size = N, replace = TRUE)
-#individ <- c(1:N)
-
-individs_per_spp <- round(runif(Nspp, 20, 30)) ### determines number of individuals per species
-species <- rep(1:Nspp, individs_per_spp) ## creates vector of species code for each individual in sp. group
-N <- length(species) ### length of species vector (# of individuals)
-
-individ <- rep(NA, N)
-
-### loop to create a sequence of individual per species, 1 through individs_per_spp
-for (sp in 1:Nspp){
-  individ[species==sp] <- 1:(individs_per_spp[sp])
-}
 
 mu_a <- rnorm(1, 16, 8)
 sigma_a <- rnorm(1, 8, 4)

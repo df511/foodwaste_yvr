@@ -8,8 +8,10 @@ library(sf)
 library(terra)
 library(dplyr)
 library(readr)
+library(readxl)
 library(tidyr)
 library(readr)
+library(stringr)
 library(ggplot2)
 library(data.table)
 library(rnaturalearth)
@@ -28,10 +30,11 @@ library(exactextractr)
 library(progressr)
 
 
+
 #### The following script is divided into modules, depending on the data type and intended output, 
 #### so as to reduce run time, repeat operations, and organize by source data
-#### If you are running for the first time, set all of the following params to TRUE
-#### If you are running to only alter part of the data generating operation,
+#### If you are running for the first time, set all of the following parameters to TRUE
+#### If you are running to alter a portion of the data compilation code,
 #### set all stages prior to the focal stage to FALSE
 
 ### Module 1: gen grids
@@ -46,6 +49,8 @@ gen_lc <- TRUE
 gen_foodretail <- TRUE
 ### Module 6: read in food retail location data
 gen_shelters <- TRUE
+### Module 7: read in property values from tax data
+gen_propvals <- TRUE
 
 #########################################################################################################
 ############ Module 1: generate grids ###########################
@@ -357,27 +362,78 @@ census_vec <- list_census_vectors(dataset ="CA21")
 census_data <- get_census(dataset = 'CA21', regions = list(CSD = "5915022"), 
                           
                           vectors = c("v_CA21_1","v_CA21_906", "v_CA21_6",
-                                      "v_CA21_5808","v_CA21_5865", "v_CA21_4204", 
+                                      "v_CA21_5808","v_CA21_5865", "v_CA21_4204",
+                                      "v_CA21_4238", "v_CA21_4239",
                                       "v_CA21_4875","v_CA21_4878", "v_CA21_4881",
                                       "v_CA21_4884", "v_CA21_4887", "v_CA21_4890",
                                       "v_CA21_4893", "v_CA21_4896", "v_CA21_4899",
                                       "v_CA21_4902", "v_CA21_4905", "v_CA21_4908",
-                                      "v_CA21_4911","v_CA21_4914"),
+                                      "v_CA21_4911","v_CA21_4914",
+                                      "v_CA21_9", "v_CA21_10",## gender
+                                      "v_CA21_4297", "v_CA21_4298", "v_CA21_4299", "v_CA21_4300", ##housing suitability, repairs...
+                                      "v_CA21_435","v_CA21_436","v_CA21_437","v_CA21_438", "v_CA21_439", "v_CA21_440", ##housing types; https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=144257
+                                      "v_CA21_4392", "v_CA21_4401", "v_CA21_4407", "v_CA21_4410", ##immigration... citizens/non-citizens, non-immigrants, immigrants
+                                      "v_CA21_4923", "v_CA21_4938"), ### ethnicity, English, Chinese, re: Ley 1995
                           labels = "detailed", geo_format = "sf", level = "DA")
+
+
+var <- colnames(census_data[,39])
+var <- var[1]
+clean_var1 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,40])
+var <- var[1]
+clean_var2 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,41])
+var <- var[1]
+clean_var3 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,42])
+var <- var[1]
+clean_var4 <- gsub("\\\\", "", var)
 
 #rename columns
 census_data <- census_data %>% 
   rename(household_income = `v_CA21_906: Median total income of household in 2020 ($)`,
          population = `v_CA21_1: Population, 2021`,
          minority_pop = `v_CA21_4875: Total visible minority population`,
-         black_pop = `v_CA21_4884: Black`, indig_pop = 'v_CA21_4204: Indigenous identity (39)',
-         pop_km = `v_CA21_6: Population density per square kilometre`
-  )
+         black_pop = `v_CA21_4884: Black`, 
+         indig_pop = `v_CA21_4204: Indigenous identity (39)`,
+         pop_km = `v_CA21_6: Population density per square kilometre`,
+         owners = `v_CA21_4238: Owner`,
+         renters = `v_CA21_4239: Renter`,
+         female = `v_CA21_10: Total - Age`,
+         male = `v_CA21_9: Total - Age`,
+         single_detached = `v_CA21_435: Single-detached house`,
+         semi_detached = `v_CA21_436: Semi-detached house`,
+         row_houses = `v_CA21_437: Row house`,
+         apt_flat = `v_CA21_438: Apartment or flat in a duplex`,
+         low_rise = `v_CA21_439: Apartment in a building that has fewer than five storeys`,
+         high_rise = `v_CA21_440: Apartment in a building that has five or more storeys`,
+         thirtyonshelter_notsuitable = !!sym(clean_var1),
+         thirtyonshelter_majorrepairs = !!sym(clean_var2),
+         notsuitable_majorrepairs = !!sym(clean_var3),
+         thirtyonshelter_notsuitable_majorepairs = !!sym(clean_var4),
+         citizens = `v_CA21_4392: Canadian citizens`,
+         non_citizens = `v_CA21_4401: Not Canadian citizens`,
+         non_immigrants = `v_CA21_4407: Non-immigrants`, 
+         immigrants = `v_CA21_4410: Immigrants`,
+         English = `v_CA21_4923: English`,
+         Chinese = `v_CA21_4938: Chinese`
+         )
 
 #calculate percemtages of ethnicities per population and create new cols in df
-census_data$black_percent <- census_data$black_pop / census_data$population
-census_data$indig_percent <- census_data$indig_pop / census_data$population
-census_data$min_percent <- census_data$minority_pop / census_data$population
+census_data$black_pct <- census_data$black_pop / census_data$population
+census_data$indig_pct <- census_data$indig_pop / census_data$population
+census_data$min_pct <- census_data$minority_pop / census_data$population
+census_data$own_pct <- census_data$owners / census_data$population
+census_data$rent_pct <- census_data$renters / census_data$population
+census_data$male_pct <- census_data$male / census_data$population
+census_data$female_pct <- census_data$female / census_data$population
+census_data$english_pct <- census_data$English / census_data$population
+census_data$chinese_pct <- census_data$Chinese / census_data$population
+census_data$citizen_pct <- census_data$citizens/ census_data$population
+census_data$noncitizen_pct <- census_data$non_citizens / census_data$population
+census_data$nonimmigrant_pct <- census_data$non_immigrants/ census_data$population
+census_data$immigrant_pct <- census_data$immigrants / census_data$population
 
 census_data <- census_data[, -c(2, 4,6,7,9, 11:13)]  # Drops columns 2, 5, and 7
 
@@ -399,6 +455,8 @@ census_data <- st_transform(census_data, st_crs(dat_grid)) ### ensure the same C
 
 # Perform a spatial join
 dat_grid <- st_join(dat_grid, census_data)
+
+
 
 ### save in file, indicating contents (food waste + demographic vars)
 save(dat_grid, file = here("data","dat_fw_demo_750.Rdata"))
@@ -542,15 +600,52 @@ lowcost_food_sf  <- lowcost_food_sf  %>%
   select(-last_update_date)  # Optionally drop original column
 
 lowcost_food_sf  <- lowcost_food_sf[, c(1,24:28)]
+lowcost_food_sf$retail_category <- "free_lowcost_food"
+lowcost_food_sf <- lowcost_food_sf %>%
+  rename(year_recorded = year)
 
 food_stores <- bind_rows(food_stores, lowcost_food_sf)
+
+
+restaurants_CoV <- st_read(here("data","restaurants_fastfood_CoV_quickOSM.geojson"))
+
+restaurants_CoV <- restaurants_CoV %>% 
+  select(amenity, shop, name)
+
+restaurants_CoV <- restaurants_CoV %>% 
+  rename(retail_category =amenity,
+         business_name = name)
+restaurants_CoV <- restaurants_CoV %>%
+  mutate(retail_category = ifelse(is.na(retail_category), shop, retail_category)) %>%
+  select(-shop)
+
+
+restaurants_CoV <- restaurants_CoV %>%
+  mutate(lon = st_coordinates(.)[,1],  # X = longitude
+         lat = st_coordinates(.)[,2]) 
+
+restaurants_CoV$year_recorded <- "2025"
+
+
+food_stores <- bind_rows(food_stores, restaurants_CoV)
+
+
+
+ggplot() +
+  geom_sf(data = food_stores, aes(color = retail_category, fill = retail_category), 
+          shape = 21, size = 3, alpha = 0.6) +  # Shape 21 allows fill + border
+  scale_fill_viridis_d() +  # Use a nice color palette
+  scale_color_viridis_d() + 
+  geom_sf(data = sites_3857, color = "orange", fill = NA) +
+  theme_minimal() +
+  labs(title = "Retail Store Categories")
+
 
 # Perform spatial join: Assigns food store points to grid cells
 joined <- st_join(dat_grid, food_stores, left = TRUE) 
 
 
-# Enable progress bar
-handlers(global = TRUE)
+
 
 # Convert to data.table
 dt_joined <- as.data.table(joined)
@@ -558,14 +653,18 @@ dt_joined <- as.data.table(joined)
 # Convert `retail_category` to a factor for faster comparison
 dt_joined[, retail_category := as.factor(retail_category)]
 
+retail_categories <- unique(food_stores$retail_category)
+retail_categories <- retail_categories[!retail_categories %in% c("NA", NA)]
 
 
+# # Enable progress bar
+handlers(global = TRUE)
 dat_grid_final <- with_progress({
   p <- progressor(along = unique(dt_joined$grid_id))  # Progress for unique grid IDs
   
   # Identify grid cells containing at least one relevant food retail location
   food_grids <- dt_joined[, .(
-    Food_Retail = as.integer(any(retail_category %in% c("Food & Beverage", "Convenience Goods", "Entertainment and Leisure"), na.rm = TRUE))
+    Food_Retail = as.integer(any(retail_category %in% retail_categories, na.rm = TRUE))
   ), by = .(grid_id)]
   
   p()  # Update progress
@@ -577,7 +676,7 @@ dat_grid_final <- with_progress({
   
 })
 
-dat_grid_final <- dat_grid_final[,-c(47:52)]
+dat_grid_final <- dat_grid_final[,-c(77:81)]
 
 #### gen nearest food retailer column
 dat_grid_final <- dat_grid_final %>%
@@ -589,6 +688,10 @@ ggplot(dat_grid_final) +
   scale_fill_manual(values = c("0" = "gray90", "1" = "red")) +
   theme_minimal() +
   labs(title = "Food & Beverage Locations", fill = "Presence")
+
+
+
+
 
 save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_750.Rdata"))
 
@@ -623,9 +726,8 @@ dat_grid_final <- dat_grid_final %>%
 save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_750.Rdata"))
 
 
+
 } else {
   ## object called "dat_grid_final"
   load(file = here("data", "dat_fw_demo_lc_retail_shelters_750.Rdata"))
 }
-
-
