@@ -60,3 +60,19 @@ MSDI <- read_excel(here("data","raw", "INDQ_MSDI_Canada", "A-MSDIData_Can2021_en
 MSDI_yvr <- MSDI %>% 
   filter(MUNIC == "5915022")
 
+
+tax <- fromJSON(here("data","raw" ,"property-tax-report.json"))
+properties <- st_read(here("data","raw" ,"property-parcel-polygons.geojson"))
+
+load(here("data","grid_clipped_750m.Rdata"))
+
+properties <- st_transform(properties, st_crs(dat_grid)) ### ensure the same CRS
+
+save(sites_3857, file = here("data","sites_3857.Rdata"))
+
+prop_cropped <- st_crop(properties, sites_3857)
+
+plot(prop_cropped)a
+
+
+waste_facilities <- fromJSON(here("data","raw" ,"permanent_waste_facilities.geojson"))

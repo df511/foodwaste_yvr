@@ -1,5 +1,5 @@
 ---
-title: "Homework2"
+title: "Food Waste Stan model exploration"
 output: html_document
 ---
 
@@ -20,31 +20,88 @@ library(here)
 library(haven)
 library(shinystan)
 library(ggplot2)
-
+library(fitdistrplus)
+library(pscl)
+library(MASS)
+library(gamlss)
+library(gamlss.data)
+library(purrr)
+library(dplyr)
+library(bayesplot)
 here()
 ```
 ### explore empirical data
 ```{r}
 ## read empirical data
 load(file = here("data", "dat_fw_demo_lc_retail_shelters_750.Rdata"))
+dat_clean <- na.omit(dat_grid_final)
+dat_scaled <- dat_clean %>%
+  mutate(across(where(is.numeric), ~ scale(.)[, 1]))  # Centers and scales by 1 SD
+
 ```
+
+```{r}
+### create inverse gamma function
+
+# rinvgamma_base <- function(n, shape, scale) {
+#   1 / rgamma(n, shape = shape, rate = 1 / scale)
+# }
+
+```
+
 ## simulate data and create first model
 ```{r}
 ### explore empirical data
 
 
-summary(dat_grid_final$fw_score)
+summary(dat_grid_final$fw_score_weighted)
 
-ggplot(dat_grid_final, aes(x = fw_score)) +
-  geom_density(fill = "blue", alpha = 0.6) +  # Adjust color and transparency
+ggplot(dat_grid_final, aes(x = fw_score_weighted)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
   theme_minimal() +
-  labs(title = "Density Plot of FW Score",
+  labs(title = "Density Plot with Rug Plot",
        x = "FW Score",
        y = "Density")
 
+ggplot(dat_grid_final, aes(x = fw_score_weighted)) +
+  geom_histogram(fill = "blue", alpha = 0.6, bins = 50) +  # Adjust bins as needed
+  theme_minimal() +
+  labs(title = "Histogram of FW Score",
+       x = "FW Score",
+       y = "Count")
+
+ggplot(dat_grid_final, aes(x = rent_pct)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Histogram of Rent Pct.",
+       x = "Rent Pct.",
+       y = "Count")
+
+ggplot(dat_grid_final, aes(x = nearest_food_retail)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Histogram of nearest_food_retail",
+       x = "Dist to Nearest Food Sales.",
+       y = "Count")
+
+ggplot(dat_grid_final, aes(x = immigrant_pct)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Immigrant Percent",
+       x = "Immigrant Percent",
+       y = "Count")
+
+fw_scores <- na.omit(dat_grid_final$fw_score_weighted)
+
+fw_scores_no0 <- dat_grid_final[!dat_grid_final$fw_score_weighted == 0,]
+
 
 # Calculate the number of zeros in your variable (e.g., fw_score)
-num_zeros <- sum(dat_grid_final$fw_score == 0)
+num_zeros <- sum(dat_grid_final$fw_score_weighted == 0)
 
 # Calculate the total number of observations
 total_obs <- nrow(dat_grid_final)
@@ -57,67 +114,1148 @@ proportion_zeros
 
 ```
 ```{r}
-set.seed(123)  # For reproducibility
+ggplot(dat_scaled, aes(x = fw_score)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Density Plot with Rug Plot",
+       x = "FW Score",
+       y = "Density")
+
+ggplot(dat_scaled, aes(x = fw_score)) +
+  geom_histogram(fill = "blue", alpha = 0.6, bins = 50) +  # Adjust bins as needed
+  theme_minimal() +
+  labs(title = "Histogram of FW Score",
+       x = "FW Score",
+       y = "Count")
+
+ggplot(dat_scaled, aes(x = rent_pct)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Histogram of Rent Pct.",
+       x = "Rent Pct.",
+       y = "Count")
+
+ggplot(dat_scaled, aes(x = nearest_food_retail)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Histogram of nearest_food_retail",
+       x = "Dist to Nearest Food Sales.",
+       y = "Count")
+
+ggplot(dat_scaled, aes(x = immigrant_pct)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Immigrant Percent",
+       x = "Immigrant Percent",
+       y = "Count")
+```
+
+```{r}
+# Create density plot
+ggplot(fw_scores_no0, aes(x = fw_score_weighted)) +
+  geom_density(fill = "blue", alpha = 0.6) +  # Adjust color and transparency
+   geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Density Plot of FW Scores (No Zeros)",
+       x = "FW Score",
+       y = "Density")
+```
+
+```{r}
+# Extract FW Score data
 
 
-n <- length(dat_grid_final$fw_score)  # Sample size
 
-# True coefficients
-a <- 0.5    # Intercept
-B1 <- 0.3   # Coefficient for X1
-B2 <- -0.5  # Coefficient for X2
-dispersion <- 3  # Overdispersion parameter (sigma^2)
+# Fit different distributions
 
-# Generate predictor variables
+fit_gamma <- fitdist(fw_scores_no0, "gamma")
+fit_exp <- fitdist(fw_scores_no0, "exp")
+fit_weibull <- fitdist(fw_scores_no0, "weibull")
 
-X1 <- rbeta(n, shape1 = 0.8, shape2 = 2.5) * 0.6 + 0.1  # Rescale to 0.1-0.7
-X2<- rnbinom(n, mu = 400, size = 1/0.5)
+fit_gamma
+fit_exp
+fit_weibull
 
-# Compute expected counts (linear predictor)
-yhat <- exp(a + B1 * X1 + B2 * X2)  # Convert to positive scale
+#fit_weibull <- fitdist(fw_scores, "weibull", start = list(shape = 1, scale = median(fw_scores_clean)))
+#fit_lognorm <- fitdist(fw_scores, "lnorm")
 
-# Simulate response variable (Negative Binomial)
-y <- rnbinom(n, mu = yhat, size = 1 / dispersion)  
+fit_weibull_no0 <- fitdist(fw_scores_no0, "weibull")
+
+
+fit_gamma <- fitdist(fw_scores, "gamma")
+summary(fit_gamma)
+###fit_lognorm <- fitdist(fw_scores, "lnorm")
+#fit_invgauss <- fitdist(fw_scores, "invgaussian")
+
+
+
+#fit_gamma <- fitdist(fw_scores_no0, "gamma")
+```
+```{r}
+# Plot the simulated rent_pct distribution
+ggplot(dat_clean, aes(x = nearest_food_retail)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "", x = "nearest food retail", y = "Density")
+
+```
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Number of grid cells (total number of observations)
+N <- 2000  # For example, you can adjust this to fit your needs
+
+# Define global parameters for intercepts (fw_score variation)
+alpha_mean <- 0.1   # Global mean for the intercept
+alpha_sd <- 0.05    # Global SD for the intercept
+
+# Define global parameters for nearest_food_retail
+food_mean <- 1000   # Mean distance to nearest food retail
+food_sd <- 500      # SD for the distance to nearest food retail
+
+# Generate data without hierarchical structure
+sim_data <- tibble(
+  nearest_food_retail = rnorm(N, mean = food_mean, sd = food_sd),  # Nearest food retail distance
+  fw_score = rnorm(N, mean = alpha_mean * 2, sd = 0.5)             # Food waste score
+)
+
+# # Ensure no negative values for nearest_food_retail and fw_score
+# sim_data$nearest_food_retail <- pmax(sim_data$nearest_food_retail, 0)
+# sim_data$fw_score <- pmax(sim_data$fw_score, 0)
+
+# Check the summary of the simulated food waste scores
+summary(sim_data$fw_score)
+
+# Plot the simulated food waste score distribution
+ggplot(sim_data, aes(x = fw_score)) +
+  geom_histogram(bins = 50, fill = "blue", alpha = 0.6) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score Distribution", 
+       x = "Food Waste Score", y = "Count")
+
+# Plot the simulated food waste score density
+ggplot(sim_data, aes(x = fw_score)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score", x = "FW Score", y = "Density")
+
+# Plot the nearest_food_retail distribution
+ggplot(sim_data, aes(x = nearest_food_retail)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Nearest Food Retail Distribution", 
+       x = "Distance to Food Retail (meters)", y = "Density")
+
+```
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Number of grid cells (total number of observations)
+N <- 2000  # For example, you can adjust this to fit your needs
+
+# Define global parameters for intercepts (fw_score variation)
+alpha_mean <- 0.1   # Global mean for the intercept
+alpha_sd <- 0.05    # Global SD for the intercept
+
+# Define global parameters for nearest_food_retail
+rent_mean <- 0.5  # Mean distance to nearest food retail
+rent_sd <- 0.25      # SD for the distance to nearest food retail
+
+# Generate data without hierarchical structure
+sim_data <- tibble(
+  rent_pct = rnorm(N, mean = rent_mean, sd = rent_sd),  # Nearest food retail distance
+  fw_score = rnorm(N, mean = alpha_mean * 2, sd = 0.5)             # Food waste score
+)
+
+# # Ensure no negative values for nearest_food_retail and fw_score
+# sim_data$nearest_food_retail <- pmax(sim_data$nearest_food_retail, 0)
+# sim_data$fw_score <- pmax(sim_data$fw_score, 0)
+
+# Check the summary of the simulated food waste scores
+summary(sim_data$fw_score)
+
+# Plot the simulated food waste score distribution
+ggplot(sim_data, aes(x = fw_score)) +
+  geom_histogram(bins = 50, fill = "blue", alpha = 0.6) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score Distribution", 
+       x = "Food Waste Score", y = "Count")
+
+# Plot the simulated food waste score density
+ggplot(sim_data, aes(x = fw_score)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score", x = "FW Score", y = "Density")
+
+# Plot the nearest_food_retail distribution
+ggplot(sim_data, aes(x = rent_pct)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Renting Percent", 
+       x = "Proportion Renters", y = "Density")
+
+
+```
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(sim_data),
+  X1 = sim_data$rent_pct,
+  fw_score = sim_data$fw_score
+)
+```
+
+# Run the stan model
+```{r}
+
+# fit <- stan(
+#   file = here("src","fw_hier_1pred.stan"),  # Path to the Stan model
+#   data = stan_data,
+#   iter = 2000,
+#   chains = 4
+# )
+
+fit <- stan(
+  file = here("src","fw_1pred_normal.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+
+
+```
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- sim_data$fw_score  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50, ])  # Plot overlay of observed vs simulated densities
+```
+
+
+### Now trying for a Gamma!
+
+
+```{r}
+
+set.seed(123)
+
+# Number of grid cells (total number of observations)
+N <- 3500  # Adjust as needed
+
+
+#### gamma distribution in Stan uses shape and rate parameterization
+# Define global parameters for intercepts (fw_score variation)
+shape <- 0.017
+rate = 1/0.96
+mean <- shape*rate
+variance <- (shape*rate)^2
+
+
+# Define global parameters for rent_pc
+rent_mean <- 0.5  # Mean proportion of renters
+rent_sd <- 0.25   # SD for renters proportion
+
+# Generate predictors
+sim_data <- tibble(
+  rent_pct = rnorm(N, mean = rent_mean, sd = rent_sd) %>% pmax(0) %>% pmin(1),  # Constrain rent_pct to [0,1]
+  
+  # Generate fw_score using a Gamma distribution
+  fw_score_weighted = rgamma(N, shape = shape, 
+                       scale = 1/rate)
+)
+
+# Check the summary of the simulated food waste scores
+summary(sim_data$fw_score_weighted)
+summary(dat_grid_final$fw_score_weighted)
+# # Plot the simulated food waste score distribution
+# ggplot(sim_data, aes(x = fw_score_weighted)) +
+#   geom_histogram(bins = 50, fill = "blue", alpha = 0.6) +
+#   theme_minimal() +
+#   labs(title = "Simulated Food Waste Score Distribution (Gamma)", 
+#        x = "Food Waste Score", y = "Count")
+
+# Plot the simulated food waste score density
+ggplot(sim_data, aes(x = fw_score_weighted)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score (Gamma)", x = "FW Score", y = "Density")
+
+
+# Plot the simulated food waste score density
+ggplot(dat_grid_final, aes(x = fw_score_weighted)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score (Gamma)", x = "FW Score", y = "Density")
+
+# Plot the rent_pct distribution
+ggplot(sim_data, aes(x = rent_pct)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Renting Percent", 
+       x = "Proportion Renters", y = "Density")
+
+
+```
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(sim_data),
+  X1 = sim_data$rent_pct,
+  fw_score = sim_data$fw_score
+)
+```
+
+```{r}
+fit <- stan(
+  file = here("src","fw_1pred_gamma.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- sim_data$fw_score  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50, ])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:50, ]) +
+  xlim(0, 0.5) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+```
+```{r}
+launch_shinystan(fit)
+```
+
+
+
+
+```{r}
+
+set.seed(123)
+
+# Number of grid cells (total number of observations)
+N <- 3500  # Adjust as needed
+
+
+#### gamma distribution in Stan uses shape and rate parameterization
+# Define global parameters for intercepts (fw_score variation)
+shape <- 0.017
+rate = 1/0.96
+mean <- shape*rate
+variance <- (shape*rate)^2
+
+
+# Define global parameters for rent_pc
+rent_mean <- 0.5  # Mean proportion of renters
+rent_sd <- 0.25   # SD for renters proportion
+
+# Generate predictors
+sim_data <- tibble(
+  rent_pct = rnorm(N, mean = rent_mean, sd = rent_sd) %>% pmax(0) %>% pmin(1),  # Constrain rent_pct to [0,1]
+  
+  # Generate fw_score using a Gamma distribution
+  fw_score_weighted = rgamma(N, shape = shape, 
+                       scale = 1/rate)
+)
+
+# Check the summary of the simulated food waste scores
+summary(sim_data$fw_score_weighted)
+summary(dat_grid_final$fw_score_weighted)
+# # Plot the simulated food waste score distribution
+# ggplot(sim_data, aes(x = fw_score_weighted)) +
+#   geom_histogram(bins = 50, fill = "blue", alpha = 0.6) +
+#   theme_minimal() +
+#   labs(title = "Simulated Food Waste Score Distribution (Gamma)", 
+#        x = "Food Waste Score", y = "Count")
+
+# Plot the simulated food waste score density
+ggplot(sim_data, aes(x = fw_score_weighted)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score (Gamma)", x = "FW Score", y = "Density")
+
+
+# Plot the simulated food waste score density
+ggplot(dat_grid_final, aes(x = fw_score_weighted)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score (Gamma)", x = "FW Score", y = "Density")
+
+# Plot the rent_pct distribution
+ggplot(sim_data, aes(x = rent_pct)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Renting Percent", 
+       x = "Proportion Renters", y = "Density")
+
+
+```
+```
+
+
+
+
+
+
+
+####### making additional predictor data
+
+
+
+```{r}
+
+set.seed(123)
+
+# Number of grid cells (total number of observations)
+N <- 2000  # Adjust as needed
+
+# Define global parameters for intercepts (fw_score variation)
+alpha_mean <- 0.2   # Global mean for the intercept
+alpha_sd <- 0.5     # SD for the intercept
+
+# Define global parameters for rent_pct
+rent_mean <- 0  # Mean proportion of renters
+rent_sd <- 0.75   # SD for renters proportion
+
+# Define global parameters for rent_pct
+mgrt_mean <- 0  # Mean proportion of renters
+mgrt_sd <- 0.75   # SD for renters proportion
+
+# Define global parameters for rent_pct
+fd_dist_mean <- 0  # Mean proportion of renters
+fd_dist_sd <- 0.75  # SD for renters proportion
+
+# Generate predictors
+sim_data <- tibble(
+  rent_pct = rnorm(N, mean = rent_mean, sd = rent_sd),
+  mgrt_pct = rnorm(N, mean = rent_mean, sd = rent_sd),
+  fd_dist = rnorm(N, mean = rent_mean, sd = rent_sd),
+  # Generate fw_score using a Gamma distribution
+  fw_score = rgamma(N, shape = (alpha_mean / alpha_sd)^2, 
+                       scale = (alpha_sd^2 / alpha_mean))
+)
+
+# Check the summary of the simulated food waste scores
+summary(sim_data$fw_score)
+
+# Plot the simulated food waste score density
+ggplot(sim_data, aes(x = fw_score)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score (Gamma)", x = "FW Score", y = "Density")
+
+# Plot the rent_pct distribution
+ggplot(sim_data, aes(x = rent_pct)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Renting Percent", 
+       x = "Proportion Renters", y = "Density")
+
+# Plot the rent_pct distribution
+ggplot(sim_data, aes(x = mgrt_pct)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Renting Percent", 
+       x = "Proportion Migrants", y = "Density")
+
+
+# Plot the rent_pct distribution
+ggplot(sim_data, aes(x = fd_dist)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Renting Percent", 
+       x = "Dist to Food Retailer", y = "Density")
 
 
 ```
 
 
 ```{r}
-set.seed(123)  # For reproducibility
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(sim_data),
+  X1 = sim_data$rent_pct,
+  X2 = sim_data$mgrt_pct,
+  X3 = sim_data$fd_dist,
+  fw_score = sim_data$fw_score
+)
+```
 
-n <- length(dat_grid_final$fw_score)  # Sample size
-
-# True coefficients
-a <- 0.5    # Intercept
-B1 <- 0.3   # Coefficient for X1
-B2 <- -0.005  # Smaller effect for X2 to prevent over-suppression
-dispersion <- 2  # Reduced overdispersion for more variation
 
 
-# Generate predictor variables
-X1 <- rbeta(n, shape1 = 0.8, shape2 = 2.5) * 0.6 + 0.1  # Rescale to 0.1-0.7
-X2 <- rnbinom(n, mu = 50, size = 1/0.5)
 
-# Compute expected counts (linear predictor)
-yhat <- exp(a + B1 * X1 + B2 * X2)  # Convert to positive scale
 
-# Simulate response variable (Negative Binomial)
-y_nonzero <- rnbinom(n, mu = yhat, size = 1 / dispersion) 
+```{r}
+fit <- stan(
+  file = here("src","fw_3pred_gamma.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+```{r}
+summary(fit)$summary[1:5,]
 
-# Introduce ~86% zeros explicitly
-zero_prob <- 0.83
-is_zero <- rbinom(n, size = 1, prob = zero_prob)  # 1 = zero, 0 = keep y_nonzero
 
-y <- ifelse(is_zero == 1, 0, y_nonzero)  # Apply zero inflation
+```
 
-# Ensure values are within range
-y <- pmin(y, 5)  # Cap at 5 if necessary
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- sim_data$fw_score  # Replace with actual observed data
 
-# Check distribution
-hist(y, breaks = 20, main = "Simulated Zero-Inflated Negative Binomial Data", col = "blue")
-mean(y == 0)  # Should be ~86%
+summary(y_obs)
+summary(y_rep[2,])
 
+ppc_dens_overlay(y_obs, y_rep[1:50, ])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:50, ]) +
+  xlim(0, 0.5) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+```
+```{r}
+launch_shinystan(fit)
+```
+
+
+#####
+#### EMPIRICAL DATA #####
+######
+######
+######
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$immigrant_pct,
+  X3 = dat_scaled$nearest_food_retail,
+  fw_score = dat_clean$fw_score
+)
+```
+
+
+
+```{r}
+fit <- stan(
+  file = here("src","fw_3pred_gamma.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50, ])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:50, ]) +
+  xlim(0, 0.1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### making zero-inflated data
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Number of sites and grid cells per site
+num_sites <- 13
+grid_cells_per_site <- sample(150:250, num_sites, replace = TRUE)  # Varying number of grid cells
+
+# Define site-specific parameters for intercepts (fw_score variation)
+site_means_alpha <- rnorm(num_sites, mean = 0.2, sd = 0.05)  # Site-specific intercepts
+site_sd_alpha <- runif(num_sites, min = 0.01, max = 0.05)   # Site-specific SD
+
+# Define site-specific means & variances for nearest_food_retail
+site_means_food <- runif(num_sites, min = 100, max = 2000)  # Site-specific mean distance (meters)
+site_sd_food <- runif(num_sites, min = 50, max = 500)       # Site-specific standard deviation
+
+# Define site-specific zero-inflation probability
+site_p_zero <- runif(num_sites, min = 0.5, max = 1)  # Proportion of zeros varies by site
+
+# Generate hierarchical data
+sim_data <- map_dfr(1:num_sites, function(site_id) {
+  n <- grid_cells_per_site[site_id]
+  
+  alpha <- rnorm(n, mean = site_means_alpha[site_id], sd = site_sd_alpha[site_id])
+  
+  # Generate nearest_food_retail from a site-specific normal distribution
+  nearest_food_retail <- rnorm(n, mean = site_means_food[site_id], sd = site_sd_food[site_id])
+  nearest_food_retail <- pmax(nearest_food_retail, 0)  # Ensure no negative distances
+  
+  # Generate zero-inflated food waste scores
+  is_zero <- rbinom(n, size = 1, prob = site_p_zero[site_id])  # 1 = zero, 0 = nonzero
+  fw_score <- ifelse(is_zero == 1, 
+                     0,  # Assign zero for some observations
+                     rgamma(n, shape = alpha * 2, scale = 0.5))  # Otherwise, use Gamma ## multiplying alpha by 2 ensures positive vals, since we're drawing from a normal distribution... 
+  
+  tibble(site_id = site_id, nearest_food_retail = nearest_food_retail, fw_score = fw_score)
+})
+
+# Check the proportion of zeros
+sum(sim_data$fw_score == 0)
+summary(sim_data$fw_score)
+
+# Plot the zero-inflated fw_score distribution
+ggplot(sim_data, aes(x = fw_score)) +
+  geom_histogram(bins = 50, fill = "blue", alpha = 0.6) +
+  theme_minimal() +
+  labs(title = "Simulated Zero-Inflated Food Waste Score Distribution", 
+       x = "Food Waste Score", y = "Count")
+
+
+# Plot the simulated rent_pct distribution
+ggplot(sim_data, aes(x = fw_score)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score", x = "FW Score", y = "Density")
+
+
+# Plot the nearest_food_retail distribution
+ggplot(sim_data, aes(x = nearest_food_retail)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Nearest Food Retail Distribution (Hierarchical Normal)", 
+       x = "Distance to Food Retail (meters)", y = "Density")
+
+```
+```{r}
+# # Prepare data for Stan model
+# stan_data <- list(
+#   N = nrow(sim_data),
+#   num_sites = num_sites,
+#   site_id = sim_data$site_id,
+#   nearest_food_retail = sim_data$nearest_food_retail,
+#   fw_score = sim_data$fw_score,
+#   p_zero = site_p_zero
+# )
+
+
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(sim_data),
+  nearest_food_retail = sim_data$nearest_food_retail,
+  fw_score = sim_data$fw_score
+)
+```
+
+# Run the stan model
+```{r}
+
+# fit <- stan(
+#   file = here("src","fw_hier_1pred.stan"),  # Path to the Stan model
+#   data = stan_data,
+#   iter = 2000,
+#   chains = 4
+# )
+
+
+fit <- stan(
+  file = here("src","fw_1pred_normal.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+
+```
+
+```{r}
+posterior_samples <- rstan::extract(fit)
+# Extract parameters
+alpha_samples <- posterior_samples$alpha_base
+beta_samples <- posterior_samples$beta_food
+sigma_samples <- posterior_samples$fw_score_sd
+y_rep <- posterior_samples$fw_score_pred
+
+pred <- data.frame(alpha_samples, beta_samples, sigma_samples, y_rep)
+
+launch_shinystan(fit)
+```
+```{r}
+ggplot(pred, aes(x = alpha_samples)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "", x = "alpha", y = "Density")
+
+ggplot(pred, aes(x = beta_samples)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "", x = "beta", y = "Density")
+
+
+ggplot(pred, aes(x = sigma_samples)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "", x = "sigma", y = "Density")
+
+
+# Convert the predictions to a long format
+fw_score_pred_long <- as.data.frame(posterior_samples$fw_score_pred)
+
+# Reshape the data from wide to long format (each prediction as a row)
+#library(tidyr)
+fw_score_pred_long <- gather(fw_score_pred_long, key = "iteration", value = "predicted_fw_score")
+
+# Add observation ID for each prediction
+fw_score_pred_long$obs_id <- rep(1:nrow(fw_score_pred_long) / 4000, each = 4000)
+
+# Check the structure of the data
+str(fw_score_pred_long)
+
+
+# Plot the posterior predictive distribution
+library(ggplot2)
+ggplot(fw_score_pred_long, aes(x = predicted_fw_score)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  facet_wrap(~ obs_id, scales = "free_y") +
+  theme_minimal() +
+  labs(title = "Posterior Predictive Distribution of Food Waste Scores", 
+       x = "Food Waste Score", y = "Density")
+
+```
+
+
+```{r}
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Number of sites and grid cells per site
+num_sites <- 13
+grid_cells_per_site <- sample(150:250, num_sites, replace = TRUE)  # Varying number of grid cells
+
+# Define site-specific parameters for intercepts (fw_score variation)
+site_means_alpha <- rnorm(num_sites, mean = 1, sd = 0.5)  # Site-specific intercepts
+site_sd_alpha <- runif(num_sites, min = 0.2, max = 0.5)   # Site-specific SD
+
+# Define site-specific means & variances for nearest_food_retail
+site_means_food <- runif(num_sites, min = 0, max = 2000)  # Site-specific mean distance (meters)
+site_sd_food <- runif(num_sites, min = 50, max = 500)       # Site-specific standard deviation
+
+# Generate hierarchical data
+sim_data <- map_dfr(1:num_sites, function(site_id) {
+  n <- grid_cells_per_site[site_id]
+  
+  alpha <- rnorm(n, mean = site_means_alpha[site_id], sd = site_sd_alpha[site_id])
+  
+  # Generate nearest_food_retail from a site-specific normal distribution
+  nearest_food_retail <- rnorm(n, mean = site_means_food[site_id], sd = site_sd_food[site_id])
+  nearest_food_retail <- pmax(nearest_food_retail, 0)  # Ensure no negative distances
+  
+  # Generate food waste score from a Gamma distribution
+  fw_score <- rgamma(n, shape = alpha * 2, scale = 0.5) 
+  
+  tibble(site_id = site_id, nearest_food_retail = nearest_food_retail, fw_score = fw_score)
+})
+
+# Check the simulated nearest_food_retail distribution
+summary(sim_data$nearest_food_retail)
+
+# Plot the nearest_food_retail distribution
+ggplot(sim_data, aes(x = nearest_food_retail)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Nearest Food Retail Distribution (Hierarchical Normal)", 
+       x = "Distance to Food Retail (meters)", y = "Density")
+
+# Plot the simulated rent_pct distribution
+ggplot(sim_data, aes(x = fw_score)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score", x = "FW Score", y = "Density")
+
+```
+
+
+```{r}
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Number of sites and grid cells per site
+num_sites <- 13
+grid_cells_per_site <- sample(150:250, num_sites, replace = TRUE)  # Varying number of grid cells
+
+# Define site-specific parameters for intercepts
+site_means_alpha <- rnorm(num_sites, mean = 1, sd = 0.5)  # Site-specific intercepts
+site_sd_alpha <- runif(num_sites, min = 0.2, max = 0.5)   # Site-specific SD
+
+# Define site-specific min/max values for rent_pct (hierarchical)
+site_min_rent <- runif(num_sites, min = 0.05, max = 0.2)  # Site-specific min
+site_max_rent <- runif(num_sites, min = 0.3, max = 0.7)  # Site-specific max
+
+# Generate hierarchical data
+sim_data <- map_dfr(1:num_sites, function(site_id) {
+  n <- grid_cells_per_site[site_id]
+  
+  alpha <- rnorm(n, mean = site_means_alpha[site_id], sd = site_sd_alpha[site_id])
+  
+  # Generate rent_pct from a site-specific uniform distribution
+  rent_pct <- runif(n, min = site_min_rent[site_id], max = site_max_rent[site_id])
+  
+  # Generate food waste score from a Gamma distribution
+  fw_score <- rgamma(n, shape = alpha * 2, scale = 0.5)
+  
+  tibble(site_id = site_id, rent_pct = rent_pct, fw_score = fw_score)
+})
+
+# Check the simulated rent_pct distribution
+summary(sim_data$rent_pct)
+
+# Plot the simulated rent_pct distribution
+ggplot(sim_data, aes(x = rent_pct)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Rent Percentage Distribution (Truncated Normal)", x = "Rent Percentage", y = "Density")
+
+
+# Plot the simulated rent_pct distribution
+ggplot(sim_data, aes(x = fw_score)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Score", x = "FW Score", y = "Density")
+
+```
+
+```{r}
+
+
+
+
+
+
+# Set seed for reproducibility
+set.seed(123)
+
+# Number of sites and grid cells per site
+num_sites <- 13
+grid_cells_per_site <- sample(150:250, num_sites, replace = TRUE)  # Varying number of grid cells
+
+# Define site-specific parameters for intercepts and predictors
+site_means_alpha <- rnorm(num_sites, mean = 1, sd = 0.5)  # Site-specific intercepts
+site_sd_alpha <- runif(num_sites, min = 0.2, max = 0.5)   # Site-specific SD
+
+site_means_rent <- rnorm(num_sites, mean = 0.2, sd = 0.6)  # Site-specific mean for rent_pct
+site_sd_rent <- rnorm(num_sites, mean = 0.3, sd = 0.6)    # Site-specific SD for rent_pct
+
+# Generate hierarchical data
+sim_data <- map_dfr(1:num_sites, function(site_id) {
+  n <- grid_cells_per_site[site_id]
+  
+  alpha <- rnorm(n, mean = site_means_alpha[site_id], sd = site_sd_alpha[site_id])
+  
+  # Generate rent_pct from a Beta distribution scaled to match observed range
+  shape1 <- ((1 - site_means_rent[site_id]) / site_sd_rent[site_id])^2
+  shape2 <- (site_means_rent[site_id] / site_sd_rent[site_id])^2
+  rent_pct <- rbeta(n, shape1, shape2) * (0.69296 - 0.05445) + 0.05445
+  
+  # Generate food waste score from a Gamma distribution
+  fw_score <- rgamma(n, shape = alpha * 2, scale = 0.5)
+  
+  tibble(site_id = site_id, rent_pct = rent_pct, fw_score = fw_score)
+})
+
+# Check the simulated rent_pct distribution
+summary(sim_data$rent_pct)
+
+# Plot the rent_pct distribution
+ggplot(sim_data, aes(x = rent_pct)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Rent Percentage Distribution", x = "Rent Percentage", y = "Density")
+
+
+
+# Plot the rent_pct distribution
+ggplot(dat_grid_final, aes(x = rent_pct)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Real Rent Percentage Distribution", x = "Rent Percentage", y = "Density")
+
+
+```
+
+
+
+```{r}
+
+Nsite = length(unique(dat_grid_final$site))
+sites <- as.integer(as.factor(unique(dat_grid_final$site)))
+N <- length(sites)
+individ <- c(1:N)
+
+mu_a <- rnorm(1, 16, 8)
+sigma_a <- rnorm(1, 8, 4)
+mu_b <- rnorm(1, 1, 0.5) 
+sigma_b <- rnorm(1, 0.5, 0.25)
+sigma_y <- rnorm(1, 20, 10)
+fw <- rgamma(individ, shape = 1, rate = 0.73)
+
+alphaspp <- rnorm(Nspp, mu_a, sigma_a)
+slopespp <- rnorm(Nspp, mu_b, sigma_b)
+
+paramsgiven <- c(mu_a, sigma_a, mu_b, sigma_b, sigma_y)
+
+
+ypred <- length(Nspp)
+
+for (n in 1:N){
+  sp <- species[n]
+  ypred[n] <- alphaspp[site] + slopespp[sp]*wetmass[n]
+}
+
+y <- rnorm(N, ypred, sigma_y)
+
+hist(y)
+
+plot.new()
+par(mfrow=c(3,2))
+
+plot(c(0,50), c(0,50), type = "n", xlab = "x", ylab = "y", asp = 1, xlim = c(0, 50))
+for (s in 1:sp) {
+  abline(a=alphaspp[s], b = slopespp[s])
+}
+
+
+## Fit Stan model to your test data 
+
+fit <- stan(here("src", "twolevelhierslopeint.stan"), data=c("N","y","Nspp","species","wetmass"), iter=1000, chains=4, seed=377)
+
+# grep stan output
+sumer <- summary(fit)$summary
+muparams <- sumer[grep("mu", rownames(sumer)), c("mean", "2.5%", "25%", "50%", "75%", "97.5%")]
+sigmaparams <- sumer[grep("sigma", rownames(sumer)), c("mean", "2.5%","25%", "50%", "75%", "97.5%")]
+
+# compare given versus modeled
+paramsgiven # here's the parameters we set
+muparams # estimated mu parameters
+sigmaparams # estimate sigma parameters
+
+spslopes <- sumer[grep("b\\[", rownames(sumer)), "mean"]
+
+plot(spslopes~slopespp, xlab="Given species-level slopes", ylab="Modeled species-level slopes", col="darkblue")
+abline(0,1)
+
+
+
+# 
+# #### thinking through model format
+# ### speed ~ a[sp] + B1[sp[i]]X1[i] + B2[sp[i]]X2[i] + B3[sp[i]]X3[i]  
+# 
+# wetmass <- rnorm(565, mean = 15, sd = 15)
+# speed <- rnorm(565, mean = 16, sd = 10)
+# swimbeat <- rnorm(565, mean = 45, sd = 20)
+# tailamp <- rnorm(565, mean = 45, 25)
+# ldh <- rnorm(565, mean = -3, sd = 2)
+# pk <- rnorm(565, mean = -6, sd = 4)
+# ak <- rnorm(565, mean = 6, sd = 6)
+# area <- rnorm(565, mean = 4, sd = 4)
+# perim <- rnorm(565, mean = 10, sd = 5)
+# majaxis <- rnorm(565, mean = 5, sd = 3)
+# breadth <- rnorm(565, mean = 1, sd = 1)
+# 
+# sim_dat <- data.frame(species, individ, wetmass, speed, swimbeat,tailamp, ldh, pk, ak, area, perim, majaxis, breadth)
+
+```
+### explore priors
+```{r}
+par(mfrow=c(3,2))
+hist(rnorm(5000, 16,8), main="Intercept mean prior", col="lightblue")
+hist(rnorm(5000,8,4), main = "Intercept variance prior", col = "lightblue")
+hist(rnorm(5000, 1, 0.5), main="Slope wetmass prior", col="lightblue")
+hist(rnorm(5000,0.5,0.25), main = "Slope wetmass variance prior", col = "lightblue")
+hist(rnorm(5000,20,10), main = "response variance prior", col = "lightblue")
+#segments(-10,25,0,25, lwd=5, col="darkblue")
+```
+
+
+# ```{r}
+# # Let's check what the predicted slopes look like
+# # Iterating over mu and sigma for intercepts and slopes
+# reps <- 12
+# mu_b <- rnorm(reps, 1,0.5)
+# sigma_b <- rtruncnorm(a=0, b=Inf, reps, 0, 20)
+# mu_shift <- rnorm(reps, 0,5)
+# sigma_shift <- rtruncnorm(a=0, b=Inf, reps, 0,15)
+# 
+# par(mfrow=c(3,4))
+# par(mar=c(3,3,1,1), mgp=c(1.5,.5,0), tck=-.01)
+# for(i in 1:reps){
+#     plot(range(year), range(y), xlab="Year", ylab="Day of year",
+#         xlim=c(-50,40),ylim=c(-50,400), type="n")
+#     species_doy <- rnorm(Nspp, mu_doy[i], sigma_doy[i])
+#     species_trend <- rnorm(Nspp, mu_shift[i], sigma_shift[i])
+#     for(sp in 1:Nspp){
+#         abline(species_doy[sp], species_trend[sp], col="lightblue")
+#     }
+#     abline(mu_doy[i], mu_shift[i], col="darkblue")
+# }
+# ```
+
+
+#### perform retrodictive checks
+
+
+```{r}
+
+posterior_samples <- extract(fit)
+# Extract parameters
+alpha_samples <- posterior_samples$a
+beta_samples <- posterior_samples$b
+sigma_samples <- posterior_samples$sigma_y
+
+# Generate posterior predictive draws
+y_rep <- matrix(NA, nrow = length(alpha_samples), ncol = N)  # Rows = draws, columns = observations
+
+# Loop over posterior samples
+for (i in 1:nrow(alpha_samples)) {  # Each row is an iteration
+  for (n in 1:N) {
+    sp <- species[n]  # Species ID for this individual
+    y_pred <- alpha_samples[i, sp] + beta_samples[i, sp] * wetmass[n]
+    y_rep[i, n] <- rnorm(1, y_pred, sigma_samples[i])  # Simulate using posterior sigma
+  }
+}
+
+hist(y, probability = TRUE, main = "Posterior Predictive Check", xlab = "y", col = "lightblue", border = "white")
+for (i in 1:100) {
+  lines(density(y_rep[i, ]), col = rgb(1, 0, 0, 0.1))
+}
+```
+
+```{r}
+mean_observed <- mean(y)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+
+```
+```{r}
+library(bayesplot)
+
+# Convert y_rep to the required format
+ppc_dens_overlay(y, y_rep[1:100, ])  # Overlay densities of observed and simulated data
+```
+
+```{r}
+col_means <- colMeans(y_rep, na.rm = TRUE) 
+residuals <- y - col_means  # Compute residuals
+residuals <- residuals[is.finite(residuals)]  # Remove non-finite values
+
+# Plot residuals
+if (length(residuals) > 0) {
+  plot(residuals, main = "Residuals", ylab = "Residuals", xlab = "Index")
+  abline(h = 0, col = "red")
+} else {
+  message("No finite residuals to plot.")
+}
+
+```
+
+
+
+
+
+
+
+
+```{r}
+dat <- na.omit(dat_grid_final)
+zaga_model <- gamlss(fw_score ~ 1, family = ZAGA, data = dat)
+summary(zaga_model)
+
+zaig_model <- gamlss(fw_score ~ 1, family = ZAIG, data = dat)
+summary(zaig_model)
+
+```
+```{r}
+AIC(zaig_model, zaga_model)
 ```
 
 
@@ -125,6 +1263,57 @@ mean(y == 0)  # Should be ~86%
 # Check the distribution of simulated data
 hist(y, breaks = 50, main = "Simulated food waste scores", 
      xlab = "Value", col = "skyblue")
+```
+
+
+
+```{r}
+# Example Data
+dat <- list(
+  N = length(fw_scores),
+  y = fw_scores
+)
+
+# Compile & Fit the Model
+zaln_model <- stan(
+  file = "intercept_ziln.stan",  # Save the Stan code above into this file
+  data = dat,
+  iter = 2000,
+  chains = 4
+)
+
+# View Results
+print(zaln_model)
+
+```
+
+```{r}
+library(posterior)
+library(ggplot2)
+# Extract posterior predictive samples
+y_rep <- extract(zaln_model, pars = "y_rep")$y_rep
+y_obs <- fw_scores  # Your actual observed data
+
+# Median of posterior predictive samples
+y_rep_median <- apply(y_rep, 2, median)
+```
+
+```{r}
+library(ggplot2)
+library(bayesplot)
+
+# Basic QQ plot
+qq_data <- data.frame(
+  observed = sort(y_obs),
+  simulated = sort(y_rep_median)
+)
+
+ggplot(qq_data, aes(sample = observed)) +
+  stat_qq(distribution = qnorm) +
+  stat_qq_line(distribution = qnorm, color = "red") +
+  labs(title = "QQ Plot of Observed vs Simulated Data", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
 ```
 
 
@@ -141,6 +1330,9 @@ ggplot(sim_data, aes(x = X1, y = y, color = X2)) +
   labs(title = "Simulated Negative Binomial Data", x = "X1", y = "Count (y)")
 
 ```
+
+
+
 
 
 ```{r}
@@ -283,11 +1475,13 @@ hist(rnorm(5000,20,10), main = "response variance prior", col = "lightblue")
 
 ```{r}
 
-posterior_samples <- extract(fit)
+posterior_samples <- rstan::extract(fit)
 # Extract parameters
-alpha_samples <- posterior_samples$a
-beta_samples <- posterior_samples$b
-sigma_samples <- posterior_samples$sigma_y
+alpha_samples <- posterior_samples$alpha_base
+beta_samples <- posterior_samples$beta_food
+sigma_samples <- posterior_samples$fw_score_sd
+y_rep <- posterior_samples$fw_score_pred
+
 
 # Generate posterior predictive draws
 y_rep <- matrix(NA, nrow = length(alpha_samples), ncol = N)  # Rows = draws, columns = observations

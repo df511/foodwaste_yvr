@@ -70,8 +70,8 @@ ggplot(dat_scaled, aes_string(x = var, y = "fw_score")) +
 
 
 # Define variable name
-var1 <- "renters"
-var2 <- "household_income"
+var1 <- "fw_score"
+var2 <- "indig_pct"
 
 # Dynamically reference the variable
 #model <- lm(as.formula(paste("fw_score ~", var)), data = dat_scaled)

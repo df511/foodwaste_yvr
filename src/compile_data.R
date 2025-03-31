@@ -38,9 +38,9 @@ library(progressr)
 #### set all stages prior to the focal stage to FALSE
 
 ### Module 1: gen grids
-gen_grids <- TRUE  # Change to FALSE to load data instead
+gen_grids <- FALSE  # Change to FALSE to load data instead
 ### Module 2: gen food waste
-gen_foodwaste <- TRUE  # Change to FALSE to load data instead
+gen_foodwaste <- FALSE  # Change to FALSE to load data instead
 ### Module 3: gen Canadian census dat (demographics)
 gen_demog <- TRUE  # Change to FALSE to load data instead
 ### Module 4: read in land cover data, calculate proportion of cell containing each of 13 land cover classes
@@ -55,95 +55,120 @@ gen_propvals <- TRUE
 #########################################################################################################
 ############ Module 1: generate grids ###########################
 
-
-
 if (gen_grids) {
-### Set parameters
-
-# Define grid cell size (e.g., 2x2)
-### size of a single side in meters
-#cell_size <- 2.2360679774998 ### for 5 sq. meters.
-#cell_size <- 5 ## for 25 sq. meters.
-cell_size <- 27.3861278 ### for ~750 sq. meters (I measured several parcels across the region and the range was ~600 to 900 sq. m)
-
-#### build functions
-
-# Function to create an internally fitting grid for each polygon
-create_internal_grid <- function(polygon, cell_size) {
-  bbox <- st_bbox(polygon)
+  ### Set parameters
   
-  # Generate grid in metric units
-  grid <- st_make_grid(polygon, cellsize = cell_size, square = TRUE, 
-                       offset = c(bbox["xmin"], bbox["ymin"]))  
+  # Define grid cell size (e.g., 2x2)
+  ### size of a single side in meters
+  #cell_size <- 2.2360679774998 ### for 5 sq. meters.
+  #cell_size <- 5 ## for 25 sq. meters.
+  cell_size <- 27.3861278 ### for ~750 sq. meters (I measured several parcels across the region and the range was ~600 to 900 sq. m)
   
-  # Convert to sf object
-  grid_sf <- st_sf(geometry = grid)
+  #### build functions
   
-  # Keep only full grid cells within the polygon
-  grid_inside <- grid_sf[st_within(grid_sf, polygon, sparse = FALSE), ]
+  # Function to create an internally fitting grid for each polygon with its site name
+  create_internal_grid <- function(polygon, cell_size, site_name) {
+    bbox <- st_bbox(polygon)
+    
+    # Generate grid in metric units
+    grid <- st_make_grid(polygon, cellsize = cell_size, square = TRUE, 
+                         offset = c(bbox["xmin"], bbox["ymin"]))  
+    
+    # Convert to sf object
+    grid_sf <- st_sf(geometry = grid)
+    
+    # Keep only full grid cells within the polygon
+    grid_inside <- grid_sf[st_within(grid_sf, polygon, sparse = FALSE), ]
+    
+    # Add site name as an attribute
+    grid_inside$name <- site_name
+    
+    return(grid_inside)
+  } 
   
-  return(grid_inside)
-}
-
-
-
-###### read files
-
-lancaster <- st_read(here("data","sites","lancaster_sites.kml"))
-weber <- st_read(here("data","sites","weber_site_edits.kml"))
-weber_rep <- weber[1:3,] ## Weber sites I visited and surveyed (drop one outside of CoV borders)
-plot(weber_rep) # check 
-weber_lancaster <- do.call(rbind, list(lancaster, weber_rep))
-#weber_lancaster_no43churchill <- do.call(rbind, list(lancaster, weber_rep2))
-
-plot(weber_lancaster) # check
-
-strathcona <- st_read(here("data","sites","strathcona_final.kml"))
-plot(strathcona)
-second_beach <- st_read(here("data","sites", "2nd_beach.kml"))
-plot(second_beach)
-
-
-sites <- do.call(rbind, list(lancaster, weber_rep, strathcona, second_beach))
-sites_3857 <- st_transform(sites, crs = 3857)
-
-save(sites_3857, file = here("data","sites_3857.Rdata"))
-
-
-# Apply function to each polygon separately
-grid_list <- lapply(st_geometry(sites_3857), create_internal_grid, cell_size = cell_size)
-
-# Combine grids
-final_grid <- do.call(rbind, grid_list)
-
-# ✅ Calculate cell area in square meters
-cell_areas <- st_area(final_grid)
-
-# Print mean cell area (if needed)
-mean_cell_area <- mean(cell_areas)
-print(paste("Mean cell size:", mean_cell_area, "square meters"))
-
-# # Plot results
-# plot(st_geometry(sites_3857), col = "lightblue", border = "black")
-# plot(st_geometry(final_grid), add = TRUE, border = "red")
-# 
-
-# Define output file name and resolution
-pdf(here("figs","grid_plot_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
-
-# Plot the grid inside polygons
-plot(st_geometry(sites_3857), col = "lightblue", border = "black")
-plot(st_geometry(final_grid), add = TRUE, border = "red")
-
-# Close the PDF device to save the file
-dev.off()
-
-save(final_grid, file = here("data","grid_clipped_750m.Rdata"))
-#######
+  
+  ###### read files
+  
+  lancaster <- st_read(here("data","sites","lancaster_sites.kml"))
+  weber <- st_read(here("data","sites","weber_site_edits.kml"))
+  weber_rep <- weber[1:3,] ## Weber sites I visited and surveyed (drop one outside of CoV borders)
+  plot(weber_rep) # check 
+  weber_lancaster <- do.call(rbind, list(lancaster, weber_rep))
+  #weber_lancaster_no43churchill <- do.call(rbind, list(lancaster, weber_rep2))
+  
+  plot(weber_lancaster) # check
+  
+  strathcona <- st_read(here("data","sites","strathcona_final.kml"))
+  plot(strathcona)
+  second_beach <- st_read(here("data","sites", "2nd_beach.kml"))
+  plot(second_beach)
+  
+  
+  sites <- do.call(rbind, list(lancaster, weber_rep, strathcona, second_beach))
+  sites_3857 <- st_transform(sites, crs = 3857)
+  sites_3857$Name <- c("lancaster_cw","lancaster_sh", "lancaster_mk" ,
+                       "lancaster_qe", "lancaster_fc",  "lancaster_dt",
+                       "lancaster_we", "lancaster_ub",
+                       "43_churchill","14_spruce", "19_yukon",  "strathcona", "2nd_beach")
+  
+  # ### plot to check correct naming
+  # # Ensure 'name' column exists
+  # if (!"Name" %in% colnames(sites_3857)) {
+  #   stop("Column 'name' not found in sites_3857!")
+  # }
+  # 
+  # # Create the plot
+  # ggplot() +
+  #   geom_sf(data = sites_3857, fill = "lightblue", color = "black") +  # Plot polygons
+  #   geom_sf_text(data = sites_3857, aes(label = Name), size = 3, color = "red") +  # Add names as text
+  #   theme_minimal() +
+  #   labs(title = "Sites with Names", x = "Longitude", y = "Latitude")
+  # 
+  # 
+  save(sites_3857, file = here("data","sites_3857.Rdata"))
+  
+  
+  # Apply function to each polygon, retaining "name" column
+  grid_list <- mapply(create_internal_grid, 
+                      st_geometry(sites_3857), 
+                      cell_size, 
+                      sites_3857$Name, 
+                      SIMPLIFY = FALSE)
+  
+  # Combine grids
+  final_grid <- do.call(rbind, grid_list)
+  
+  # ✅ Calculate cell area in square meters
+  cell_areas <- st_area(final_grid)
+  
+  # Print mean cell area (if needed)
+  mean_cell_area <- mean(cell_areas)
+  print(paste("Mean cell size:", mean_cell_area, "square meters"))
+  
+  # # Plot results
+  # plot(st_geometry(sites_3857), col = "lightblue", border = "black")
+  # plot(st_geometry(final_grid), add = TRUE, border = "red")
+  # 
+  
+  # Define output file name and resolution
+  pdf(here("figs","grid_plot_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+  
+  # Plot the grid inside polygons
+  plot(st_geometry(sites_3857), col = "lightblue", border = "black")
+  plot(st_geometry(final_grid), add = TRUE, border = "red")
+  
+  # Close the PDF device to save the file
+  dev.off()
+  
+  save(final_grid, file = here("data","grid_clipped_750m.Rdata"))
+  #######
 } else {
-## file called "final_grid"
-load(file = here("data", "grid_clipped_750m.Rdata"))
+  ## file called "final_grid"
+  load(file = here("data", "grid_clipped_750m.Rdata"))
 }
+
+
+
 
 grid_clipped_750m <- final_grid
 st_crs(grid_clipped_750m) <- 3857
@@ -180,13 +205,21 @@ surv_dat <- surv_dat[c(5:48),]
 surv_dist <- read_csv(here("data","survey_area_distance.csv"))
 surv_dist <- surv_dist[c(1:10),c(1:4)] #### NEED TO REPLACE 19_Yukon WITH SHORTENED SURVEY
 
+### calculate number of site visits
+total_visits <- surv_dat %>%
+  group_by(site) %>%
+  summarize(total_visits = n_distinct(date))
+
+
 ###### merge survey data with food waste data
 dat <- left_join(merged_data, surv_dat, by = c("site" = "site", "date" ="date"), relationship = "many-to-many")
 dat <- left_join(dat, surv_dist, by = c("site" = "site"))
-
+##Join the unique visits data with the main data
+dat <- dat %>%
+  left_join(total_visits, by = "site")
 
 ##### filter to only req'd columns
-dat<- dat[,c(1,9:18, 23:36)]
+dat<- dat[,c(1,9:18, 23:36, 39)]
 ## rename for interpretability
 dat <- dat %>% rename(waste_type = type.y,
                       bin_form = form.y,
@@ -244,7 +277,7 @@ dat[waste_type == "food_litter", bin_form := "food_litter"]
 # Replace bin_form with "food_litter" where waste_type is "food_litter"
 dat[waste_type == "food_litter", bin_state := "food_litter"]
 
-### create spatial data frame
+# ### create spatial data frame
 dat_sf <- st_as_sf(dat, sf_column_name = "geometry")
 
 ######## CONSIDER ADJUSTING THESE BASED ON ASSUMPTIONS
@@ -295,17 +328,24 @@ weights_fld <- c("<visible" = 0.05,
 
 
 
-# Step 3: Calculate weighted values and adjustment factors
+# Vectorized lookup using match() instead of sapply()
 dat_sf <- dat_sf %>%
   mutate(
-    state_weight = sapply(bin_state, function(x) weights_state[x]),
-    form_weight = sapply(bin_form, function(x) weights_form[x]),
-    type_weight = sapply(waste_type, function(x) weights_type[x]),
-    fld_weight = sapply(fl_density, function(x) weights_fld[x]),
-    # Apply additional multiplication for food_litter
-    #additional_weight = ifelse(bin_form == "food_litter", (total_area * fld_weight/100), 1), ##### 
-    weighted_value = bin_count * state_weight * form_weight * type_weight #* additional_weight 
+    state_weight = weights_state[match(bin_state, names(weights_state))],
+    form_weight = weights_form[match(bin_form, names(weights_form))],
+    type_weight = weights_type[match(waste_type, names(weights_type))],
+    fld_weight = weights_fld[match(fl_density, names(weights_fld))],
+    weighted_value = bin_count * state_weight * form_weight * type_weight
   )
+
+# 
+# 
+# # Convert to data.table if not already
+# setDT(dat_sf)
+
+# # Summarize using data.table syntax
+# summed_df <- dat[, .(sum_weighted_value = sum(weighted_value, na.rm = TRUE)), 
+#                     by = .(fid,site, pickup_type, date)]
 
 
 # If they are different, transform dat_sf to match grid_clipped_25m
@@ -317,21 +357,38 @@ dat_sf_centroids <- st_centroid(dat_sf)
 # Perform a spatial join to associate each centroid with a grid cell
 dat_sf_joined <- st_join(dat_sf_centroids, grid_clipped_750m, left = FALSE)
 
-# Aggregate the weighted_value for each grid cell
-aggregated_values <- dat_sf_joined %>%
-  group_by(grid_id) %>%  # Replace grid_id with the actual identifier column in grid_clipped_25m
-  summarise(total_weighted_value = sum(weighted_value, na.rm = TRUE))
+# # Convert to data.table if not already
+setDT(dat_sf_joined)
 
-# Merge back with the grid to retain geometries
-dat_grid <- st_join(grid_clipped_750m, aggregated_values, left = TRUE)
+# Create adjusted_sum_weighted_value column with case-like logic
+dat_sf_joined[, adjusted_weighted_value := weighted_value * fifelse(
+  pickup_type == "misc.", 1 / total_visits,
+  fifelse(pickup_type %in% c("recycling", "garbage"), 1 / 14,
+          fifelse(pickup_type == "none", 12 / 14, 1)))  # Default case: 1
+]
+
+fw_scores <- dat_sf_joined[, .(fw_score_weighted = sum(adjusted_weighted_value, na.rm = TRUE),
+                                       fw_score_max = max(adjusted_weighted_value, na.rm = TRUE)), 
+                                   by = .(grid_id)]  # Replace grid_id with actual column name
+
+
+
+dat_grid <- merge(grid_clipped_750m, fw_scores, by = "grid_id", all.x = TRUE)
+
 dat_grid <- dat_grid %>%
-  mutate(total_weighted_value = replace_na(total_weighted_value, 0))
+  mutate(fw_score_weighted = replace_na(fw_score_weighted, 0),
+         fw_score_max= replace_na(fw_score_max, 0))
 
+# Access the attribute data of the sf object and replace -Inf with NA
+dat_grid[] <- lapply(dat_grid[], function(x) {
+  if (is.numeric(x)) {
+    x[x == -Inf] <- NA
+  }
+  return(x)
+})
 
 dat_grid <- dat_grid %>%
-  dplyr::select(-grid_id.y) %>%  # Drop "grid_id.y"
-  dplyr::rename(grid_id = grid_id.x) %>%  # Rename "grid_id.x" to "grid_id"
-  dplyr::rename(fw_score = total_weighted_value)  # Rename "total_weighted_value" to "fw_score"
+  dplyr::rename(site = name)
 
 
 #### Save and name file!!
@@ -377,16 +434,16 @@ census_data <- get_census(dataset = 'CA21', regions = list(CSD = "5915022"),
                           labels = "detailed", geo_format = "sf", level = "DA")
 
 
-var <- colnames(census_data[,39])
-var <- var[1]
-clean_var1 <- gsub("\\\\", "", var)
-var <- colnames(census_data[,40])
-var <- var[1]
-clean_var2 <- gsub("\\\\", "", var)
 var <- colnames(census_data[,41])
 var <- var[1]
-clean_var3 <- gsub("\\\\", "", var)
+clean_var1 <- gsub("\\\\", "", var)
 var <- colnames(census_data[,42])
+var <- var[1]
+clean_var2 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,43])
+var <- var[1]
+clean_var3 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,44])
 var <- var[1]
 clean_var4 <- gsub("\\\\", "", var)
 
@@ -631,14 +688,14 @@ food_stores <- bind_rows(food_stores, restaurants_CoV)
 
 
 
-ggplot() +
-  geom_sf(data = food_stores, aes(color = retail_category, fill = retail_category), 
-          shape = 21, size = 3, alpha = 0.6) +  # Shape 21 allows fill + border
-  scale_fill_viridis_d() +  # Use a nice color palette
-  scale_color_viridis_d() + 
-  geom_sf(data = sites_3857, color = "orange", fill = NA) +
-  theme_minimal() +
-  labs(title = "Retail Store Categories")
+# ggplot() +
+#   geom_sf(data = food_stores, aes(color = retail_category, fill = retail_category), 
+#           shape = 21, size = 3, alpha = 0.6) +  # Shape 21 allows fill + border
+#   scale_fill_viridis_d() +  # Use a nice color palette
+#   scale_color_viridis_d() + 
+#   geom_sf(data = sites_3857, color = "orange", fill = NA) +
+#   theme_minimal() +
+#   labs(title = "Retail Store Categories")
 
 
 # Perform spatial join: Assigns food store points to grid cells
@@ -676,7 +733,7 @@ dat_grid_final <- with_progress({
   
 })
 
-dat_grid_final <- dat_grid_final[,-c(77:81)]
+dat_grid_final <- dat_grid_final[,-c(79:83)]
 
 #### gen nearest food retailer column
 dat_grid_final <- dat_grid_final %>%

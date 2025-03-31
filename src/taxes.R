@@ -86,6 +86,10 @@ dat_grid_final <- dat_grid_final %>%
   left_join(st_drop_geometry(tax_grid_joined), by = "grid_id")
 
 
+#### considering interactions
+dat_grid_final$rent_val_interaction <- dat_grid_final$rent_pct*dat_grid_final$mean_land_value
+
+dat_grid_final$own_val_interaction <- dat_grid_final$own_pct*dat_grid_final$mean_land_value
 
 
 

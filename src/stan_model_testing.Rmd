@@ -1,0 +1,225 @@
+---
+title: "fw_hier_1pred.stan"
+output: html_document
+date: '2025-03-25'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+## Started 4 March 2025
+## by Daniel Forrest ##
+
+rm(list=ls()) 
+options(stringsAsFactors = FALSE)
+```
+
+
+```{r}
+library(rstan)
+library(here)
+library(haven)
+library(shinystan)
+library(ggplot2)
+library(fitdistrplus)
+library(pscl)
+library(MASS)
+library(gamlss)
+library(gamlss.data)
+library(purrr)
+here()
+```
+
+
+
+```{r}
+options(mc.cores = parallel::detectCores())
+
+# Simulate Fake Data for Testing
+set.seed(123)
+N <- 3000 # Number of grid cells
+p_zero <- 0.86  # 20% chance of zero-inflation
+
+# True parameters
+alpha_true <- 3
+beta_true <- 2
+
+# Generate food waste scores
+fw_score <- ifelse(runif(N) < p_zero, 
+                   0, 
+                   rgamma(N, shape = alpha_true, rate = beta_true))
+
+
+# Prepare data for Stan
+stan_data <- list(N = N, fw_score = fw_score, p_zero = p_zero)
+
+```
+
+
+```{r}
+ggplot(stan_data$fw_score) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "", x = "fw_score", y = "Density")
+
+```
+
+
+
+```{r}
+# Run MCMC
+# Fit the model
+fit <- stan(
+  file = here("src","fw_intercept.stan"),  # Path to the Stan model
+  data = stan_data,
+  iter = 2000,
+  chains = 4
+)
+
+# Print summary
+print(fit, pars = c("alpha", "beta"))
+
+# Extract samples
+samples <- rstan::extract(fit)
+
+# Plot posterior distributions
+df <- data.frame(alpha = samples$alpha, beta = samples$beta, fw_score_pred = samples$fw_score_pred)
+ggplot(df, aes(x = alpha)) + geom_density(fill = "blue", alpha = 0.3) +
+  labs(title = "Posterior Distribution of Alpha") +
+  theme_minimal()
+
+ggplot(df, aes(x = beta)) + geom_density(fill = "red", alpha = 0.3) +
+  labs(title = "Posterior Distribution of Beta") +
+  theme_minimal()
+
+ggplot(df, aes(x = fw_score_pred)) + geom_density(fill = "blue", alpha = 0.3) +
+  labs(title = "Posterior Distribution of Fw Score") +
+  theme_minimal()
+```
+
+
+```{r}
+
+# Simulate data as in your script
+set.seed(123)
+
+num_sites <- 13
+grid_cells_per_site <- sample(150:250, num_sites, replace = TRUE)
+
+site_means_alpha <- rnorm(num_sites, mean = 0.5, sd = 0.5)
+site_sd_alpha <- runif(num_sites, min = 0.2, max = 0.5)
+
+site_means_food <- runif(num_sites, min = 100, max = 2000)
+site_sd_food <- runif(num_sites, min = 50, max = 500)
+
+site_p_zero <- runif(num_sites, min = 0.2, max = 0.95)
+
+sim_data <- map_dfr(1:num_sites, function(site_id) {
+  n <- grid_cells_per_site[site_id]
+  
+  alpha <- rnorm(n, mean = site_means_alpha[site_id], sd = site_sd_alpha[site_id])
+  
+  nearest_food_retail <- rnorm(n, mean = site_means_food[site_id], sd = site_sd_food[site_id])
+  nearest_food_retail <- pmax(nearest_food_retail, 0)
+  
+  is_zero <- rbinom(n, size = 1, prob = site_p_zero[site_id])
+  fw_score <- ifelse(is_zero == 1, 
+                     0,  
+                     rgamma(n, shape = alpha * 2, scale = 0.5))
+  
+  tibble(site_id = site_id, nearest_food_retail = nearest_food_retail, fw_score = fw_score)
+})
+
+sim_data <- na.omit(sim_data)
+
+sim_data[,2:3] <- scale(sim_data[,2:3])
+
+
+# Plot the simulated rent_pct distribution
+ggplot(sim_data, aes(x = fw_score)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "", x = "fw_score", y = "Density")
+
+
+
+
+# Prepare data for Stan model
+stan_data <- list(
+  N = nrow(sim_data),
+  num_sites = num_sites,
+  site_id = sim_data$site_id,
+  nearest_food_retail = sim_data$nearest_food_retail,
+  fw_score = sim_data$fw_score,
+  p_zero = site_p_zero
+)
+
+
+```
+```{r}
+# Fit the model
+fit <- stan(
+  file = here("src","fw_hier_1pred.stan"),  # Path to the Stan model
+  data = stan_data,
+  iter = 2000,
+  chains = 4
+)
+
+# Check model fit
+print(fit)
+traceplot(fit)
+
+# Extract predictions
+posterior_samples <- rstan::extract(fit)
+predictions <- posterior_samples$fw_score_pred
+
+# Plot predictions vs observed values
+observed_values <- sim_data$fw_score
+predicted_values <- rowMeans(predictions)
+
+ggplot() +
+  geom_point(aes(x = observed_values, y = predicted_values), alpha = 0.6) +
+  labs(title = "Observed vs Predicted Food Waste Scores", x = "Observed FW Score", y = "Predicted FW Score")
+
+```
+
+```{r}
+# Fit the model
+fit <- stan(
+  file = here("src","fw_1pred.stan"),  # Path to the Stan model
+  data = stan_data_1pred,
+  iter = 2000,
+  chains = 4,
+  init = init_values
+)
+```
+
+
+```{r}
+# Fit the model
+fit <- stan(
+  file = here("src","fw_hier_1pred.stan"),  # Path to the Stan model
+  data = stan_data,
+  iter = 2000,
+  chains = 4
+)
+
+# Check model fit
+print(fit)
+traceplot(fit)
+
+# Extract predictions
+posterior_samples <- rstan::extract(fit)
+predictions <- posterior_samples$fw_score_pred
+
+# Plot predictions vs observed values
+observed_values <- sim_data$fw_score
+predicted_values <- rowMeans(predictions)
+
+ggplot() +
+  geom_point(aes(x = observed_values, y = predicted_values), alpha = 0.6) +
+  labs(title = "Observed vs Predicted Food Waste Scores", x = "Observed FW Score", y = "Predicted FW Score")
+
+```
+
