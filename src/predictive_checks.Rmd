@@ -1,0 +1,243 @@
+---
+title: "prior_predictive_checks.Rmd"
+output: html_document
+date: '2025-04-03'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Plot example histograms (e.g., first 4 sims)
+library(ggplot2)
+```
+
+#3 predictors for LN, 1 for binom, non-hierarchical, single sim
+```{r}
+
+# Set seed for reproducibility
+set.seed(9)
+
+# Number of grid cells
+N <- 2942  # Adjust as needed
+
+# Simulate predictor values
+X1 <- runif(N, 0, 1)  # Proportion of renters (continuous variable)
+X2 <- runif(N, 0, 1)  # Proportion of renters (continuous variable)
+X3 <- runif(N, 0, 1)  # Proportion of renters (continuous variable)
+P1 <- runif(N, 0, 1)  # Pavement proportion (continuous variable)
+
+# Sample parameters from priors
+mu <- rnorm(1, -6, 4)          # Prior for raw mean food waste
+beta1 <- rnorm(1, 0,4 )        # Prior for effect of X1
+beta2 <- rnorm(1, 0,4 )        # Prior for effect of X1
+beta3 <- rnorm(1, 0,4 )        # Prior for effect of X1
+sigma <- abs(rnorm(1, 0, 1))  # Ensure positive sigma
+
+gamma <- rnorm(1, 0, 1)      # Prior for zero-inflation intercept
+delta1 <- rnorm(1, 0, 1)      # Prior for effect of P1 on zero-inflation
+
+# Compute transformed parameters
+mean_raw <- exp(mu + beta1 * X1 + beta2*X2 + beta3*X3)  # Raw mean values (no log transformation)
+pi <- plogis(gamma + delta1 * P1)  # Probability of zero-inflation (logistic link)
+
+# Generate zero-inflated lognormal food waste scores
+fw_score_weighted <- numeric(N)
+for (n in 1:N) {
+  if (runif(1) < pi[n]) {
+    fw_score_weighted[n] <- 0  # Zero food waste with probability pi
+  } else {
+    fw_score_weighted[n] <- rlnorm(1, log(mean_raw[n]), sigma)  # Raw scale
+  }
+}
+
+fw_scores_no0 <- fw_score_weighted[fw_score_weighted>0]
+
+# Plot histogram of generated food waste scores (raw scale)
+ggplot(data.frame(fw_score_weighted), aes(x = fw_score_weighted)) +
+  geom_histogram(bins = 100, fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Scores (Raw Scale)",
+       x = "Food Waste Score", y = "Count")
+
+# Plot histogram of generated food waste scores (raw scale)
+ggplot(data.frame(fw_scores_no0), aes(x = fw_scores_no0)) +
+  geom_histogram(bins = 100, fill = "blue", alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Simulated Food Waste Scores (Raw Scale)",
+       x = "Food Waste Score", y = "Count")
+
+```
+#3 predictors for LN, 1 for binom, non-hierarchical
+```{r}
+set.seed(150)
+
+# Number of grid cells
+N <- 2942
+
+# Number of simulations
+n_sim <- 20
+
+# Store all simulations
+all_sim_data <- list()
+
+# Loop over multiple draws from prior
+for (i in 1:n_sim) {
+  # Simulate predictor values
+  X1 <- runif(N, 0, 1)
+  X2 <- runif(N, 0, 1)  # Proportion of renters (continuous variable)
+  X3 <- runif(N, 0, 1)  # Proportion of renters (continuous variable)
+  P1 <- runif(N, 0, 1)
+
+  # Sample parameters from priors
+  mu <- rnorm(1, -4.5, 3)
+  beta1 <- rnorm(1, 0,4 )        # Prior for effect of X1
+  beta2 <- rnorm(1, 0,4 )        # Prior for effect of X1
+  beta3 <- rnorm(1, 0,4 )        # Prior for effect of X1
+  sigma <- abs(rnorm(1, 0, 1))
+
+ # gamma <- rbeta(1, 12, 3) ## beta is unstable..
+  gamma <- rnorm(1, 0.5, 0.5)
+  delta1 <- rnorm(1, 0.5, 1)
+
+  # Compute transformed parameters
+  mean_raw <- exp(mu + beta1 * X1 + beta2 * X2 + beta3 * X3)
+  pi <- plogis(gamma + delta1 * P1)
+
+  # Simulate data
+  fw_score_weighted <- numeric(N)
+  for (n in 1:N) {
+    if (runif(1) < pi[n]) {
+      fw_score_weighted[n] <- 0
+    } else {
+      fw_score_weighted[n] <- rlnorm(1, log(mean_raw[n]), sigma)
+    }
+  }
+
+  all_sim_data[[i]] <- data.frame(
+    sim_id = i,
+    fw_score_weighted = fw_score_weighted,
+    non_zero = fw_score_weighted > 0
+  )
+}
+
+# Combine all simulations
+sim_df <- bind_rows(all_sim_data)
+
+ggplot(filter(sim_df, sim_id <= 10), aes(x = fw_score_weighted)) +
+  geom_histogram(bins = 100, fill = "darkblue", alpha = 0.6) +
+  facet_wrap(~ sim_id, scales = "free_x") +
+  theme_minimal() +
+  labs(title = "Prior Predictive Simulations: Food Waste Scores",
+       x = "Food Waste Score", y = "Count")
+
+# Optionally: plot proportion of zeros per simulation
+sim_summary <- sim_df %>%
+  group_by(sim_id) %>%
+  summarise(pct_zero = mean(fw_score_weighted == 0))
+
+ggplot(sim_summary, aes(x = sim_id, y = pct_zero)) +
+  geom_col(fill = "firebrick") +
+  theme_minimal() +
+  labs(title = "Proportion of Zeros by Simulation",
+       x = "Simulation ID", y = "Proportion Zero")
+
+```
+#hierarchical data
+
+```{r}
+# Simulate data with hierarchical structure (site-level intercepts)
+# Matches Stan model with 13 sites and varying intercepts
+
+set.seed(150)
+N <- 2942
+J <- 13
+n_sim <- 20
+
+# Create site IDs
+site_id <- sample(1:J, size = N, replace = TRUE)
+
+# Store simulation outputs
+all_sims <- list()
+
+for (i in 1:n_sim) {
+  # Simulate predictors
+  X1 <- runif(N, 0, 1)
+  X2 <- runif(N, 0, 1)
+  X3 <- runif(N, 0, 1)
+  P1 <- runif(N, 0, 1)
+
+  # Hierarchical priors
+  mu0 <- rnorm(1, -4.5, 3)
+  tau_mu <- abs(rnorm(1, 0, 1))
+  mu_raw <- rnorm(J, 0, 1)
+  mu_site <- mu0 + tau_mu * mu_raw
+
+  beta1 <- rnorm(1, 0, 1)
+  beta2 <- rnorm(1, 0, 1)
+  beta3 <- rnorm(1, 0, 1)
+  sigma <- abs(rnorm(1, 0, 1))
+
+  gamma <- rnorm(1, 0.75, 0.25)
+  delta1 <- rnorm(1, 0, 1)
+
+  # Compute linear predictors
+  log_mean <- mu_site[site_id] + beta1 * X1 + beta2 * X2 + beta3 * X3
+  pi <- plogis(gamma + delta1 * P1)
+  mean_raw <- exp(log_mean)
+
+  # Simulate zero-inflated lognormal response
+  fw_score_weighted <- numeric(N)
+  for (n in 1:N) {
+    if (runif(1) < pi[n]) {
+      fw_score_weighted[n] <- 0
+    } else {
+      fw_score_weighted[n] <- rlnorm(1, log(mean_raw[n]), sigma)
+    }
+  }
+
+  all_sims[[i]] <- tibble(
+    sim_id = i,
+    fw_score_weighted,
+    site = site_id,
+    zero = fw_score_weighted == 0
+  )
+}
+
+# Combine all
+sim_df <- bind_rows(all_sims)
+
+# Plot: Histograms of food waste by simulation
+ggplot(filter(sim_df, sim_id <= 8), aes(x = fw_score_weighted)) +
+  geom_histogram(bins = 100, fill = "steelblue", alpha = 0.6) +
+  facet_wrap(~ sim_id, scales = "free_x") +
+  theme_minimal() +
+  labs(title = "Prior Predictive Simulations: Food Waste Scores",
+       x = "Food Waste Score", y = "Count")
+
+# Plot: Proportion of Zeros by simulation
+sim_df %>%
+  group_by(sim_id) %>%
+  summarise(p_zero = mean(zero)) %>%
+  ggplot(aes(x = sim_id, y = p_zero)) +
+  geom_col(fill = "firebrick") +
+  theme_minimal() +
+  labs(title = "Proportion of Zeros by Simulation",
+       x = "Simulation ID", y = "Proportion Zero")
+
+# Optional: Variation in site-level means (per simulation)
+site_means <- sim_df %>%
+  group_by(sim_id, site) %>%
+  summarise(mean_fw = mean(fw_score_weighted), .groups = "drop")
+
+ggplot(site_means, aes(x = factor(site), y = mean_fw)) +
+  geom_boxplot(fill = "darkgreen", alpha = 0.5) +
+  facet_wrap(~ sim_id, scales = "free_y") +  # Allow y-axis to vary
+  labs(title = "Site-level Mean Food Waste Scores by Simulation",
+       x = "Site", y = "Mean Food Waste Score") +
+  theme_minimal()
+
+
+```
+

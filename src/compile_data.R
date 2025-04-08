@@ -788,3 +788,34 @@ save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_750.Rdat
   ## object called "dat_grid_final"
   load(file = here("data", "dat_fw_demo_lc_retail_shelters_750.Rdata"))
 }
+
+
+
+#########################################################################################################
+############## Module 6: read in nearest homeless shelter #################
+
+if (gen_finalmods) {
+
+dat_grid_final$NaturalVegSum <- dat_grid_final$Conifer+dat_grid_final$Deciduous+dat_grid_final$Shrub+dat_grid_final$NatGrassHerb
+dat_grid_final$BuiltSum <- dat_grid_final$Paved+dat_grid_final$Buildings+dat_grid_final$OtherBuilt
+dat_grid_final$GrassSoilSum <- dat_grid_final$ModGrassHerb + dat_grid_final$Soil
+
+dat_grid_final <- dat_grid_final %>%
+  mutate(across(where(is.numeric), ~replace_na(., 0)))
+
+dat_grid_final <- dat_grid_final %>%
+  select(-name) ### remove "name" column. No use for it and is NA for all grid cells in pacific spirit ("lancaster_ub") transect. Causes problems.
+
+
+
+save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_mods_750.Rdata"))
+
+
+} else {
+  ## object called "dat_grid_final"
+  load(file = here("data", "dat_fw_demo_lc_retail_shelters_mods_750.Rdata"))
+}
+
+
+
+

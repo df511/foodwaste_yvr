@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 rm(list=ls()) 
 options(stringsAsFactors = FALSE)
+options(mc.cores = parallel::detectCores())
 ```
 
 ```{r}
@@ -33,19 +34,20 @@ here()
 ### explore empirical data
 ```{r}
 ## read empirical data
-load(file = here("data", "dat_fw_demo_lc_retail_shelters_750.Rdata"))
+load(file = here("data", "dat_fw_demo_lc_retail_shelters_mods_750.Rdata"))
 dat_clean <- na.omit(dat_grid_final)
 dat_scaled <- dat_clean %>%
   mutate(across(where(is.numeric), ~ scale(.)[, 1]))  # Centers and scales by 1 SD
+save(dat_scaled, file = here("data", "dat_scaled_750.Rdata"))
 
 ```
 
 ```{r}
 ### create inverse gamma function
 
-# rinvgamma_base <- function(n, shape, scale) {
-#   1 / rgamma(n, shape = shape, rate = 1 / scale)
-# }
+rinvgamma_base <- function(n, shape, scale) {
+  1 / rgamma(n, shape = shape, rate = 1 / scale)
+}
 
 ```
 
@@ -56,20 +58,20 @@ dat_scaled <- dat_clean %>%
 
 summary(dat_grid_final$fw_score_weighted)
 
-ggplot(dat_grid_final, aes(x = fw_score_weighted)) +
+ggplot(dat_clean, aes(x = fw_score_weighted)) +
   geom_density(fill = "blue", alpha = 0.6) +
   geom_rug(alpha = 0.3) +  # Rug plot for raw data
   theme_minimal() +
   labs(title = "Density Plot with Rug Plot",
        x = "FW Score",
        y = "Density")
-
-ggplot(dat_grid_final, aes(x = fw_score_weighted)) +
-  geom_histogram(fill = "blue", alpha = 0.6, bins = 50) +  # Adjust bins as needed
-  theme_minimal() +
-  labs(title = "Histogram of FW Score",
-       x = "FW Score",
-       y = "Count")
+# 
+# ggplot(dat_grid_final, aes(x = fw_score_weighted)) +
+#   geom_histogram(fill = "blue", alpha = 0.6, bins = 50) +  # Adjust bins as needed
+#   theme_minimal() +
+#   labs(title = "Histogram of FW Score",
+#        x = "FW Score",
+#        y = "Count")
 
 ggplot(dat_grid_final, aes(x = rent_pct)) +
   geom_density(fill = "blue", alpha = 0.6) +
@@ -95,9 +97,7 @@ ggplot(dat_grid_final, aes(x = immigrant_pct)) +
        x = "Immigrant Percent",
        y = "Count")
 
-fw_scores <- na.omit(dat_grid_final$fw_score_weighted)
-
-fw_scores_no0 <- dat_grid_final[!dat_grid_final$fw_score_weighted == 0,]
+fw_scores_no0 <- dat_clean[!dat_clean$fw_score_weighted == 0,]
 
 
 # Calculate the number of zeros in your variable (e.g., fw_score)
@@ -114,7 +114,7 @@ proportion_zeros
 
 ```
 ```{r}
-ggplot(dat_scaled, aes(x = fw_score)) +
+ggplot(dat_clean, aes(x = fw_score_weighted+0.001)) +
   geom_density(fill = "blue", alpha = 0.6) +
   geom_rug(alpha = 0.3) +  # Rug plot for raw data
   theme_minimal() +
@@ -122,12 +122,29 @@ ggplot(dat_scaled, aes(x = fw_score)) +
        x = "FW Score",
        y = "Density")
 
-ggplot(dat_scaled, aes(x = fw_score)) +
+ggplot(fw_scores_no0, aes(x = fw_score_weighted)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Density Plot with Rug Plot",
+       x = "FW Score",
+       y = "Density")
+
+
+ggplot(dat_scaled, aes(x = fw_score_weighted)) +
   geom_histogram(fill = "blue", alpha = 0.6, bins = 50) +  # Adjust bins as needed
   theme_minimal() +
   labs(title = "Histogram of FW Score",
        x = "FW Score",
        y = "Count")
+# Create density plot
+ggplot(fw_scores_no0, aes(x = fw_score_weighted)) +
+  geom_density(fill = "blue", alpha = 0.6) +  # Adjust color and transparency
+   geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Density Plot of FW Scores (No Zeros)",
+       x = "FW Score",
+       y = "Density")
 
 ggplot(dat_scaled, aes(x = rent_pct)) +
   geom_density(fill = "blue", alpha = 0.6) +
@@ -153,26 +170,241 @@ ggplot(dat_scaled, aes(x = immigrant_pct)) +
        x = "Immigrant Percent",
        y = "Count")
 ```
-
 ```{r}
-# Create density plot
-ggplot(fw_scores_no0, aes(x = fw_score_weighted)) +
-  geom_density(fill = "blue", alpha = 0.6) +  # Adjust color and transparency
-   geom_rug(alpha = 0.3) +  # Rug plot for raw data
+ggplot(dat_grid_final, aes(x = log(fw_score_weighted))) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
   theme_minimal() +
-  labs(title = "Density Plot of FW Scores (No Zeros)",
-       x = "FW Score",
+  labs(title = "Density Plot with Rug Plot",
+       x = "ln(Weighted FW Score)",
+       y = "Density")
+
+
+
+ggplot(dat_grid_final, aes(x = log(fw_score_max))) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Density Plot with Rug Plot",
+       x = "ln(Maximum FW Score)",
        y = "Density")
 ```
+
+
+
+
+```{r}
+set.seed(123)  # For reproducibility
+
+# Number of grid cells
+N <- 416  
+
+# Simulating predictor: Proportion of renters (bounded between 0.05 and 0.69)
+X1 <- rnorm(N, mean = 0.28, sd = 0.1)
+
+# True parameters
+mu <- -3.5  # Intercept in log-scale
+beta <- 0.5  # Effect of X1
+sigma <- 1.61  # Standard deviation of lognormal distribution
+
+# Compute log-scale mean
+log_mean <- mu + beta * X1
+
+# Generate food waste scores from a lognormal distribution
+fw_score_weighted <- rlnorm(N, meanlog = log_mean, sdlog = sigma)
+
+# Store in a data frame
+sim_data <- data.frame(X1, fw_score_weighted)
+
+# Save to CSV for use in Stan
+#write.csv(data, "simulated_lognormal_data.csv", row.names = FALSE)
+
+# Plot the distribution
+#hist(sim_data$fw_score_weighted, breaks = 30, main = "Simulated Food Waste Scores", col = "skyblue", border = "black")
+
+ggplot(sim_data, aes(x = fw_score_weighted)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Density Plot with Rug Plot",
+       x = "FW Score",
+       y = "Density")
+
+ggplot(sim_data, aes(x = X1)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Density Plot with Rug Plot",
+       x = "FW Score",
+       y = "Density")
+
+
+# Check the summary of the simulated food waste scores
+summary(sim_data$fw_score_weighted)
+# Check the summary of the simulated food waste scores
+summary(fw_scores_no0$fw_score_weighted)
+
+summary(sim_data$X1)
+summary(dat_clean$rent_pct)
+
+```
+
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(sim_data),
+  X1 = sim_data$X1,
+  fw_score_weighted = sim_data$fw_score_weighted
+)
+```
+```{r}
+fit <- stan(
+  file = here("src","fw_1pred_lognormal.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+#mu_rep <- extract(fit)$mu  # Change "y_rep" based on how you named your predicted values
+y_obs <- sim_data$fw_score  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50, ])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:50, ]) +
+  xlim(0, 0.5) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+```
+```{r}
+summary(y_rep[1:50])
+summary(sim_data$fw_score_weighted)
+summary(fw_scores_no0$fw_score_weighted)
+
+```
+
+
+
+
+
+```{r}
+set.seed(123)  # For reproducibility
+
+# Number of grid cells
+N <- 3500  # Adjusted to match desired sample size
+
+# Simulating predictor: Proportion of renters (bounded between 0.05 and 0.69)
+X1 <- rnorm(N, mean = 0.28, sd = 0.08)
+#X1 <- pmax(pmin(X1, 0.69), 0.05)  # Ensure X1 stays within [0.05, 0.69]
+
+# True parameters
+mu <- -2.5  # Intercept in log-scale
+beta <- 0.5  # Effect of X1
+sigma <- 0.83  # Standard deviation of lognormal distribution
+zero_prob <- 0.86  # Probability of zero-inflation (~86%)
+
+# Compute log-scale mean
+log_mean <- mu + beta * X1
+
+# Generate zero-inflation indicator (1 = nonzero, 0 = zero)
+is_nonzero <- rbinom(N, size = 1, prob = 1 - zero_prob)
+
+# Generate food waste scores from lognormal where is_nonzero == 1
+fw_score_weighted <- ifelse(is_nonzero == 1, rlnorm(N, meanlog = log_mean, sdlog = sigma), 0)
+
+# Store in a data frame
+sim_data <- data.frame(X1, fw_score_weighted)
+
+# # Save to CSV for use in Stan
+# write.csv(sim_data, "simulated_zi_lognormal_data.csv", row.names = FALSE)
+
+
+ggplot(sim_data, aes(x = fw_score_weighted)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Density Plot with Rug Plot",
+       x = "FW Score",
+       y = "Density")
+
+ggplot(sim_data, aes(x = X1)) +
+  geom_density(fill = "blue", alpha = 0.6) +
+  geom_rug(alpha = 0.3) +  # Rug plot for raw data
+  theme_minimal() +
+  labs(title = "Density Plot with Rug Plot",
+       x = "Rent Pct.",
+       y = "Density")
+
+
+# Check the summary of the simulated food waste scores
+summary(sim_data$fw_score_weighted)
+# Check the summary of the simulated food waste scores
+summary(dat_clean$fw_score_weighted)
+
+summary(sim_data$X1)
+summary(dat_clean$rent_pct)
+```
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(sim_data),
+  X1 = sim_data$X1,
+  fw_score_weighted = sim_data$fw_score_weighted
+)
+```
+
+
+```{r}
+fit <- stan(
+  file = here("src","fw_1pred_ZILN.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000)
+```
+
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+#mu_rep <- extract(fit)$mu  # Change "y_rep" based on how you named your predicted values
+y_obs <- sim_data$fw_score  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50, ])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:50, ]) +
+  xlim(0, 0.5) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+```
+
 
 ```{r}
 # Extract FW Score data
 
-
+### finding the best distribution
 
 # Fit different distributions
 
-fit_gamma <- fitdist(fw_scores_no0, "gamma")
+fit_gamma <- fitdist(dat_grid_final$fw_score_weighted, "gamma")
+
+fit_invgamma <- fitdist(1/(dat_grid_final$fw_score_weighted+0.01), "gamma")
+
+fit_lognorm <- fitdist(fw_scores_no0$fw_score_weighted, "lnorm")
+
+
 fit_exp <- fitdist(fw_scores_no0, "exp")
 fit_weibull <- fitdist(fw_scores_no0, "weibull")
 
@@ -505,7 +737,6 @@ ggplot(sim_data, aes(x = rent_pct)) +
 
 
 ```
-```
 
 
 
@@ -644,14 +875,18 @@ launch_shinystan(fit)
 ######
 
 
+
+
+
+
+##### no 0s
+
 ```{r}
 # Prepare data for Stan model (no hierarchy)
 stan_data <- list(
-  N = nrow(dat_scaled),
-  X1 = dat_scaled$rent_pct,
-  X2 = dat_scaled$immigrant_pct,
-  X3 = dat_scaled$nearest_food_retail,
-  fw_score = dat_clean$fw_score
+  N = nrow(fw_scores_no0),
+  X1 = fw_scores_no0$rent_pct,
+  fw_score_weighted = fw_scores_no0$fw_score_weighted
 )
 ```
 
@@ -659,7 +894,7 @@ stan_data <- list(
 
 ```{r}
 fit <- stan(
-  file = here("src","fw_3pred_gamma.stan"),  # Path to the Stan model
+  file = here("src","fw_1pred_lognormal.stan"),  # Path to the Stan model
   data = stan_data, 
   chains = 4, 
   iter = 2000, 
@@ -670,9 +905,9 @@ fit <- stan(
 ```{r}
 # Extract posterior samples
 y_rep <- extract(fit)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
-y_obs <- dat_clean$fw_score  # Replace with actual observed data
+y_obs <- fw_scores_no0$fw_score_weighted  # Replace with actual observed data
 
-ppc_dens_overlay(y_obs, y_rep[1:50, ])  # Plot overlay of observed vs simulated densities
+ppc_dens_overlay(y_obs, y_rep[1:50,])  # Plot overlay of observed vs simulated densities
 
 # Plot overlay of observed vs simulated densities with x-axis range 0 to 4
 ppc_dens_overlay(y_obs, y_rep[1:50, ]) +
@@ -686,6 +921,699 @@ ppc_dens_overlay(y_obs, y_rep[1:50, ]) +
 
 
 
+##### Zero-inflated
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+```{r}
+fit_rent_ZILN <- stan(
+  file = here("src","fw_1pred_ZILN.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+```
+
+
+```{r}
+summary(y_rep[1:2000])
+summary(sim_data$fw_score_weighted)
+summary(y_obs)
+
+```
+
+
+
+
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+```{r}
+launch_shinystan(fit_rent_ZILN)
+```
+
+
+
+
+
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$nearest_shelter_dist,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+
+
+```{r}
+fit_rent_dist_ZILN <- stan(
+  file = here("src","fw_2pred_ZILN.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+
+
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_rent_dist_ZILN)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+```
+
+
+```{r}
+summary(y_rep[1:2000])
+summary(sim_data$fw_score_weighted)
+summary(y_obs)
+
+```
+
+
+
+
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+
+```{r}
+launch_shinystan(fit_rent_dist_ZILN)
+```
+
+
+
+######## rent pct and single fam housing (highly negatively correlated)
+
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$single_detached,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+
+
+```{r}
+fit_rent_singlehouse_ZILN <- stan(
+  file = here("src","fw_2pred_ZILN.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_rent_singlehouse_ZILN)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+```
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+```{r}
+launch_shinystan(fit_rent_singlehouse_ZILN)
+```
+
+
+
+
+
+######## rent pct and shelters housing (highly negatively correlated)
+
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$nearest_shelter_dist,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+
+
+```{r}
+fit_rent_shelters_ZILN <- stan(
+  file = here("src","fw_2pred_ZILN.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_rent_shelters_ZILN)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+```
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+```{r}
+launch_shinystan(fit_rent_shelters_ZILN)
+```
+
+
+
+
+
+
+
+######## rent pct and citizens housing (highly negatively correlated)
+
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$citizen_pct,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+
+
+```{r}
+fit_rent_citizens_ZILN <- stan(
+  file = here("src","fw_2pred_ZILN.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_rent_citizens_ZILN)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+```
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+```{r}
+launch_shinystan(fit_rent_shelters_ZILN)
+```
+
+
+
+######## rent pct and women housing (highly negatively correlated)
+
+
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$female_pct,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+
+
+```{r}
+fit_rent_fem_ZILN <- stan(
+  file = here("src","fw_2pred_ZILN.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_rent_shelters_ZILN)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[2000:4000,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:4000, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:4000, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+```
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+```{r}
+launch_shinystan(fit_rent_fem_ZILN)
+```
+
+
+############
+############
+####### predict bernouli & ZILN
+
+
+##### Zero-inflated 1 var in each model portion
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  P1 = dat_scaled$BuiltSum,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+```{r}
+fit_rent_ZILN_bern <- stan(
+  file = here("src","fw_1pred_ZILN_bernlogit_opt.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_rent_ZILN_bern)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- extract(fit_rent_ZILN_bern)$pi_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[2000:2050,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 0.00001)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+```
+
+
+```{r}
+summary(y_rep[2000:4000])
+summary(dat_clean$fw_score_weighted)
+summary(y_obs)
+summary(pi_pred[2000:4000])
+```
+
+
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+```{r}
+launch_shinystan(fit_rent_ZILN_bern)
+```
+
+###########
+### Two predictors in ZILN
+## One in Bernoulli
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$nearest_food_retail,
+  P1 = dat_scaled$BuiltSum,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+```{r}
+fit_rent_ZILN_bern <- stan(
+  file = here("src","fw_2pred_ZILN_bernlogit_opt.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_rent_ZILN_bern)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- extract(fit_rent_ZILN_bern)$pi_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+pi_obs <- ifelse(fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+
+
+
+ppc_dens_overlay(y_obs, y_rep[2000:2050,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 0.00001)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Convert posterior predictive samples to a long format
+pi_pred_df <- as.data.frame(pi_pred)
+pi_pred_long <- pi_pred_df %>%
+  pivot_longer(cols = everything(), names_to = "Iteration", values_to = "pi_pred")
+# Calculate the mean of pi_obs
+mean_pi_obs <- mean(pi_obs, na.rm = TRUE)
+
+# Create the plot
+ggplot(pi_pred_long, aes(x = pi_pred)) +
+  geom_histogram(binwidth = 0.005, fill = "lightblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", size = 1) +  # Add red vertical line
+  labs(title = "Posterior Predictive Check for pi",
+       x = "Predicted pi",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+
+
+```{r}
+summary(y_rep[1:11696000])
+summary(dat_clean$fw_score_weighted)
+summary(y_obs)
+summary(pi_pred[1:11696000])
+```
+
+
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means",breaks = 40)
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+```{r}
+launch_shinystan(fit_rent_ZILN_bern)
+```
+
+
+
+
+
+
+###########
+### Two predictors in ZILN
+## Two in Bernoulli
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$nearest_food_retail,
+  P1 = dat_scaled$BuiltSum,
+  P2 = dat_scaled$GrassSoilSum,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+```{r}
+fit_A_rent_retail_B_built_grass <- stan(
+  file = here("src","fw_2pred_ZILN_2pred_bern.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+save(fit_A_rent_retail_B_built_grass, file = here("data","fit_A_rent_retail_B_built_grass.Rdata"))
+```
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_rent_retail_built_grass)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- extract(fit_rent_retail_built_grass)$pi_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+pi_obs <- ifelse(fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+
+
+
+ppc_dens_overlay(y_obs, y_rep[2000:2050,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 0.00001)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Convert posterior predictive samples to a long format
+pi_pred_df <- as.data.frame(pi_pred)
+pi_pred_long <- pi_pred_df %>%
+  pivot_longer(cols = everything(), names_to = "Iteration", values_to = "pi_pred")
+# Calculate the mean of pi_obs
+mean_pi_obs <- mean(pi_obs, na.rm = TRUE)
+
+# Create the plot
+ggplot(pi_pred_long, aes(x = pi_pred)) +
+  geom_histogram(binwidth = 0.005, fill = "lightblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", size = 1) +  # Add red vertical line
+  labs(title = "Posterior Predictive Check for pi",
+       x = "Predicted pi",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+
+```{r}
+summary(y_rep[1:11696000])
+summary(dat_clean$fw_score_weighted)
+summary(y_obs)
+summary(pi_pred[1:11696000])
+```
+
+
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means",breaks = 40)
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+```{r}
+launch_shinystan(fit_A_rent_retail_B_built_grass)
+```
 
 
 
@@ -694,42 +1622,405 @@ ppc_dens_overlay(y_obs, y_rep[1:50, ]) +
 
 
 
+###########
+### Two predictors in ZILN
+## Two in Bernoulli
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$nearest_food_retail,
+  P1 = dat_scaled$NaturalVegSum,
+  P2 = dat_scaled$pop_km,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+```{r}
+fit_A_rent_retail_B_natveg_pop <- stan(
+  file = here("src","fw_2pred_ZILN_2pred_bern.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+save(fit_A_rent_retail_B_natveg_pop, file = here("data","fit_A_rent_retail_B_natveg_pops.Rdata"))
+```
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_A_rent_retail_B_natveg_pop)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- extract(fit_A_rent_retail_B_natveg_pop)$pi_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+pi_obs <- ifelse(fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+
+
+
+ppc_dens_overlay(y_obs, y_rep[2000:2050,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 0.00001)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Convert posterior predictive samples to a long format
+pi_pred_df <- as.data.frame(pi_pred)
+pi_pred_long <- pi_pred_df %>%
+  pivot_longer(cols = everything(), names_to = "Iteration", values_to = "pi_pred")
+# Calculate the mean of pi_obs
+mean_pi_obs <- mean(pi_obs, na.rm = TRUE)
+
+# Create the plot
+ggplot(pi_pred_long, aes(x = pi_pred)) +
+  geom_histogram(binwidth = 0.005, fill = "lightblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", size = 1) +  # Add red vertical line
+  labs(title = "Posterior Predictive Check for pi",
+       x = "Predicted pi",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+
+```{r}
+summary(y_rep[1:11696000])
+summary(dat_clean$fw_score_weighted)
+summary(y_obs)
+summary(pi_pred[1:11696000])
+```
+
+
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means",breaks = 40)
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+```{r}
+launch_shinystan(fit_A_rent_retail_B_natveg_pop)
+```
+###########
+### One predictors in ZILN
+## Two in Bernoulli
+### changed Bernoulli
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  P1 = dat_scaled$NaturalVegSum,
+  P2 = dat_scaled$nearest_food_retail,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+```{r}
+fit_A_rent_B_natveg_retail <- stan(
+  file = here("src","fw_1pred_ZILN_2pred_bern.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+save(fit_A_rent_B_natveg_retail, file = here("data","fit_A_rent_B_natveg_retails.Rdata"))
+```
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_A_rent_B_natveg_retail)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- extract(fit_A_rent_B_natveg_retail)$pi_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+pi_obs <- ifelse(fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+
+
+
+ppc_dens_overlay(y_obs, y_rep[2000:2050,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 0.00001)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Convert posterior predictive samples to a long format
+pi_pred_df <- as.data.frame(pi_pred)
+pi_pred_long <- pi_pred_df %>%
+  pivot_longer(cols = everything(), names_to = "Iteration", values_to = "pi_pred")
+# Calculate the mean of pi_obs
+mean_pi_obs <- mean(pi_obs, na.rm = TRUE)
+
+# Create the plot
+ggplot(pi_pred_long, aes(x = pi_pred)) +
+  geom_histogram(binwidth = 0.005, fill = "lightblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", size = 1) +  # Add red vertical line
+  labs(title = "Posterior Predictive Check for pi",
+       x = "Predicted pi",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+
+```{r}
+summary(y_rep[1:11696000])
+summary(dat_clean$fw_score_weighted)
+summary(y_obs)
+summary(pi_pred[1:11696000])
+```
+
+
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means",breaks = 40)
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+```{r}
+launch_shinystan(fit_A_rent_B_natveg_retail)
+```
+
+
+
+###########
+### Three predictors in ZILN
+## One in Bernoulli
+### changed Bernoulli
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$nearest_food_retail,
+  X3 = dat_scaled$female_pct,
+  P1 = dat_scaled$NaturalVegSum,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+```{r}
+fit_A_rent_retail_fem_B_natveg <- stan(
+  file = here("src","fw_3pred_ZILN_1pred_bern.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+save(fit_A_rent_retail_fem_B_natveg, file = here("data","fit_A_rent_retail_fem_B_natveg.Rdata"))
+```
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_A_rent_retail_fem_B_natveg)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- extract(fit_A_rent_retail_fem_B_natveg)$pi_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+pi_obs <- ifelse(dat_grid_final$fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+
+
+
+ppc_dens_overlay(y_obs, y_rep[2000:2050,])  # Plot overlay of observed vs simulated densities
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Convert posterior predictive samples to a long format
+pi_pred_df <- as.data.frame(pi_pred)
+pi_pred_long <- pi_pred_df %>%
+  pivot_longer(cols = everything(), names_to = "Iteration", values_to = "pi_pred")
+# Calculate the mean of pi_obs
+mean_pi_obs <- mean(pi_obs, na.rm = TRUE)
+
+# Create the plot
+ggplot(pi_pred_long, aes(x = pi_pred)) +
+  geom_histogram(binwidth = 0.005, fill = "lightblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", size = 1) +  # Add red vertical line
+  labs(title = "Posterior Predictive Check for pi",
+       x = "Predicted pi",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+```{r}
+library(bayesplot)
+
+# y_obs: your observed data
+# y_rep: posterior predictive draws (matrix), each row is a draw, columns = N observations
+
+# Function to compute proportion of zeros
+prop_zeros <- function(y) mean(y == 0)
+
+# Compute proportion of zeros for each posterior predictive draw
+prop_zeros_sim <- apply(y_rep, 1, prop_zeros)
+
+# Compute proportion of zeros in observed data
+prop_zeros_obs <- mean(y_obs == 0)
+
+# Plot
+ppc_stat(y = y_obs, yrep = y_rep, stat = "prop_zeros") +
+  geom_vline(xintercept = prop_zeros_obs, color = "red", linetype = "dashed", size = 1) +
+  labs(title = "Posterior Predictive Check: Proportion of Zeros",
+       x = "Proportion Zero", y = "Frequency") +
+  theme_minimal()
+
+```
+
+```{r}
+summary(y_rep[1:11696000])
+summary(dat_clean$fw_score_weighted)
+summary(y_obs)
+summary(pi_obs)
+summary(pi_pred[1:11696000])
+```
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means",breaks = 40)
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+```{r}
+launch_shinystan(fit_A_rent_retail_fem_B_natveg)
+```
+
+
+
+
+
+###############
+#########
+#### THREE PREDICTORS
+
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$nearest_shelter_dist,
+  X3 = dat_scaled$indig_pct,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+
+
+```{r}
+fit_rent_dist_indig_ZILN <- stan(
+  file = here("src","fw_3pred_ZILN.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+
+
+
+```{r}
+# Extract posterior samples
+y_rep <- extract(fit_rent_dist_indig_ZILN)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+
+ppc_dens_overlay(y_obs, y_rep[1:50,])  # Plot overlay of observed vs simulated densities
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0, 0.00001) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1:500, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 4)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+```
+
+
+```{r}
+summary(y_rep[1:2000])
+summary(sim_data$fw_score_weighted)
+summary(y_obs)
+
+```
 
 
 
 
 
 
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means")
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```{r}
+launch_shinystan(fit_rent_dist_indig_ZILN)
+```
 
 
 
