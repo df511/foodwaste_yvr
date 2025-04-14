@@ -6,7 +6,7 @@
 library(here)
 library(readr)
 library(dplyr)
-
+library(reshape2)
 
 # Get lower triangle of the correlation matrix
 get_lower_tri<-function(cormat){
@@ -55,7 +55,7 @@ my_data <- my_data[, colSums(is.na(my_data)) == 0]  # Remove NA columns
 
 
 #cormat <- cor(my_data)
-cormat <- cor(my_data[, -c(1,4,8,11,14,15,20, 21,23,24, 30:32, 79)])
+cormat <- cor(my_data[, -c(1,4,8,11,14,15,20, 21,23,24, 30:32, 84)])
 
 #cormat <- cormat[-37,-37] ### remove NA column one of the repairs needed, FIX THIS
 
@@ -92,7 +92,9 @@ heatmap
 # Define the variables to keep in the heatmap
 selected_vars <- c("fw_score_weighted", "rent_pct", "single_detached" ,"noncitizen_pct", 
                    "nearest_food_retail","nearest_shelter_dist","indig_pct", 
-                   "female_pct", "SCOREMAT", "SCORESOC", "Paved", "NaturalVegSum", "BuiltSum", "GrassSoilSum")  # Replace with actual column names
+                   "female_pct", "SCOREMAT", "SCORESOC", "Paved", "NaturalVegSum", "BuiltSum", "GrassSoilSum", "pop_km",
+                   "household_income", "housing_highdensity", "housing_lowdensity",
+                   "thirtyonshelter_majorrepairs", "notsuitable_majorrepairs")  # Replace with actual column names
 
 # Ensure the selected variables exist in the dataset
 selected_vars <- selected_vars[selected_vars %in% colnames(my_data)]

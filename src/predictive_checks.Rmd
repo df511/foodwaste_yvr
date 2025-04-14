@@ -321,6 +321,15 @@ ppc_dens_overlay(y_obs, y_rep[1000:1050, ]) +
   theme_minimal()
 
 
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[1000:1050, ]) +
+  xlim(0.001,0.01) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
 # Convert posterior predictive samples to a long format
 pi_pred_df <- as.data.frame(pi_pred)
 pi_pred_long <- pi_pred_df %>%

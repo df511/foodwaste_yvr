@@ -59,7 +59,7 @@ model {
   beta4 ~ normal(0, 0.3);
   sigma ~ normal(0, 0.3);
 
-  gamma ~ normal(0.8, 0.2);
+  gamma ~ normal(1, 1);
   delta1 ~ normal(0, 0.3);
   delta2 ~ normal(0, 0.3);
   }

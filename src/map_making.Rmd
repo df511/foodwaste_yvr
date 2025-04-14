@@ -1,0 +1,525 @@
+---
+title: "Map making"
+output: html_document
+date: '2025-04-11'
+---
+
+```{r}
+library(sf)
+```
+
+
+```{r}
+
+
+
+# Define output file name and resolution
+pdf(here("figs","food_waste_score_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid) +
+  geom_sf(aes(fill = log(fw_score)), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Weighted Value") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+#######
+
+
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","renter_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = log(rent_pct)), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Weighted Value") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","conifer_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = log(Conifer)), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Weighted Value") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","grass_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = log(ModGrassHerb)), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Weighted Value") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","food_retail_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = Food_Retail), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Weighted Value") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","chinese_pct_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = chinese_pct), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Chinese_pct") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","food_stores_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(joined) +
+  geom_sf(aes(fill = food_stores), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "food_stores") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","nearest_food_retail_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = nearest_food_retail), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "nearest_food_retail") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","pct_rent_subsidized_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = pct_rent_subsidized), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "pct_rent_subsidized") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","pct_rent_thirty_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = pct_rent_thirty), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "pct_rent_thirty") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","notsuitable_majorrepairs_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = notsuitable_majorrepairs), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "notsuitable_majorrepairs") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","pct_housing_notsuitables_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = pct_housing_notsuitable), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "pct_housing_notsuitable") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","poorserivce_housing_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = poorservice_housing), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "poorservice_housing") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","NaturalVegSum_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = NaturalVegSum), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "NaturalVegSum") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","NaturalVegSum_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = NaturalVegSum), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "NaturalVegSum") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","Deciduous_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = Deciduous), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Deciduous") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","Conifer_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = Conifer), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Conifer") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","Shrub_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = Shrub), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Shrub") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","NatGrassHerb_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = NatGrassHerb), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "NatGrassHerbb") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","Soil_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = Soil), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Soil") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","Barren_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = Barren), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Barren") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","NonphotoVeg_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = NonphotoVeg), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "NonphotoVeg") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+# Define output file name and resolution
+pdf(here("figs","Shadow_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = Shadow), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Shadow") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","Water_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = Water), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Water") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+# Define output file name and resolution
+pdf(here("figs","OtherBuilt_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = OtherBuilt), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "OtherBuilt") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","landcover_sites.pdf"), width = 20, height = 14)  # Adjust size as needed
+
+plot(lcc2020_van)
+plot(st_geometry(sites_3857), add = TRUE,  lwd = 2)
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","landcover_sites.pdf"), width = 20, height = 14)  # Adjust size as needed
+
+plot(lc)
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","NaturalVegSum2_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = NaturalVegSum2), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "NaturalVegSum2") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","Deciduous_750m_fromdatgrid.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid) +
+  geom_sf(aes(fill = Deciduous), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Deciduous") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","Conifer_750m_fromdatgrid.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid) +
+  geom_sf(aes(fill = Conifer), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Conifer") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","Conifer_750m_fromjoined.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(joined) +
+  geom_sf(aes(fill = Conifer), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Conifer") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","Conifer_750m_from1stdat_grid_final.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = Conifer), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Conifer") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","Conifer_750m_from2nddat_grid_final.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = Conifer), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Conifer") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","NaturalVegSum_750m_from2nddat_grid_final.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = NaturalVegSum), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "NaturalVegSum") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","NaturalVegSum_750m_from_dat_clean.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_clean) +
+  geom_sf(aes(fill = NaturalVegSum), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "NaturalVegSum") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","NaturalVegSum_750m_from_dat_scaled.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = NaturalVegSum), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "NaturalVegSum") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","Conifer_750m_from_dat_clean.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_clean) +
+  geom_sf(aes(fill = Conifer), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Conifer") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+```

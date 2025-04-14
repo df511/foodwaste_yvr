@@ -49,8 +49,13 @@ gen_lc <- TRUE
 gen_foodretail <- TRUE
 ### Module 6: read in food retail location data
 gen_shelters <- TRUE
+# ### Module 7: read in property values from tax data
+# gen_propvals <- TRUE
 ### Module 7: read in property values from tax data
-gen_propvals <- TRUE
+gen_finalmods <- TRUE
+### Module 8: read in property values from tax data
+gen_center_std <- TRUE
+
 
 #########################################################################################################
 ############ Module 1: generate grids ###########################
@@ -427,7 +432,7 @@ census_data <- get_census(dataset = 'CA21', regions = list(CSD = "5915022"),
                                       "v_CA21_4902", "v_CA21_4905", "v_CA21_4908",
                                       "v_CA21_4911","v_CA21_4914",
                                       "v_CA21_9", "v_CA21_10",## gender
-                                      "v_CA21_4297", "v_CA21_4298", "v_CA21_4299", "v_CA21_4300", ##housing suitability, repairs...
+                                      "v_CA21_4297", "v_CA21_4298", "v_CA21_4299", "v_CA21_4300","v_CA21_4314","v_CA21_4315", "v_CA21_4316", ##housing suitability, repairs...
                                       "v_CA21_435","v_CA21_436","v_CA21_437","v_CA21_438", "v_CA21_439", "v_CA21_440", ##housing types; https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=144257
                                       "v_CA21_4392", "v_CA21_4401", "v_CA21_4407", "v_CA21_4410", ##immigration... citizens/non-citizens, non-immigrants, immigrants
                                       "v_CA21_4923", "v_CA21_4938"), ### ethnicity, English, Chinese, re: Ley 1995
@@ -446,6 +451,16 @@ clean_var3 <- gsub("\\\\", "", var)
 var <- colnames(census_data[,44])
 var <- var[1]
 clean_var4 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,45])
+var <- var[1]
+clean_var5 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,46])
+var <- var[1]
+clean_var6 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,47])
+var <- var[1]
+clean_var7 <- gsub("\\\\", "", var)
+
 
 #rename columns
 census_data <- census_data %>% 
@@ -469,6 +484,9 @@ census_data <- census_data %>%
          thirtyonshelter_majorrepairs = !!sym(clean_var2),
          notsuitable_majorrepairs = !!sym(clean_var3),
          thirtyonshelter_notsuitable_majorepairs = !!sym(clean_var4),
+         pct_rent_subsidized = !!sym(clean_var5),
+         pct_rent_thirty = !!sym(clean_var6),
+         pct_housing_notsuitable = !!sym(clean_var7),
          citizens = `v_CA21_4392: Canadian citizens`,
          non_citizens = `v_CA21_4401: Not Canadian citizens`,
          non_immigrants = `v_CA21_4407: Non-immigrants`, 
@@ -543,8 +561,28 @@ lc_prop <- exact_extract(lcc2020_van, dat_grid, fun = "frac")
 #### values from Report (No #14, Snow/Ice) https://metrovancouver.org/services/regional-planning/Documents/mv-land-cover-classification-sei-update-2022.pdf
 colnames(lc_prop) <- c("Buildings", "Paved", "OtherBuilt", "Barren", "Soil","Conifer","Deciduous","Shrub","ModGrassHerb","NatGrassHerb","NonphotoVeg","Water","Shadow")
 
-lc_prop$grid_id <- 1:nrow(lc_prop)
-dat_grid <- left_join(dat_grid, lc_prop, by = "grid_id")
+lc_prop$grid_id <- dat_grid$grid_id
+
+### check for identical duplicates (yes, all 1s returned)
+lc_prop %>%
+  group_by(grid_id) %>%
+  filter(n() > 1) %>%
+  summarise(across(where(is.numeric), ~ length(unique(.)))) %>%
+  summarise(across(everything(), max))
+
+# Check if rows sum to 1
+row_sums <- rowSums(lc_prop[, 1:13], na.rm = TRUE)
+# Quick summary of sums
+summary(row_sums)
+# Optional: flag any rows that don’t sum to (almost) 1
+which(abs(row_sums - 1) > 1e-6)
+
+lc_prop_clean <- lc_prop %>%
+  distinct(grid_id, .keep_all = TRUE)
+
+
+#lc_prop$grid_id <- 1:nrow(lc_prop)
+dat_grid <- left_join(dat_grid, lc_prop_clean, by = "grid_id")
 rm(lcc2020,lcc2020_van, lc_prop)
 ### save file
 save(dat_grid, file = here("data","dat_fw_demo_lc_750.Rdata"))
@@ -733,7 +771,7 @@ dat_grid_final <- with_progress({
   
 })
 
-dat_grid_final <- dat_grid_final[,-c(79:83)]
+dat_grid_final <- dat_grid_final[,-c(82:85)]
 
 #### gen nearest food retailer column
 dat_grid_final <- dat_grid_final %>%
@@ -796,9 +834,16 @@ save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_750.Rdat
 
 if (gen_finalmods) {
 
-dat_grid_final$NaturalVegSum <- dat_grid_final$Conifer+dat_grid_final$Deciduous+dat_grid_final$Shrub+dat_grid_final$NatGrassHerb
+dat_grid_final$NaturalVegSum2 <- dat_grid_final$Conifer +dat_grid_final$Deciduous+dat_grid_final$Shrub +dat_grid_final$NatGrassHerb +dat_grid_final$Soil +dat_grid_final$Barren +dat_grid_final$NonphotoVeg+dat_grid_final$OtherBuilt
+dat_grid_final$NaturalVegSum <- dat_grid_final$Conifer +dat_grid_final$Deciduous+dat_grid_final$Shrub +dat_grid_final$NatGrassHerb
 dat_grid_final$BuiltSum <- dat_grid_final$Paved+dat_grid_final$Buildings+dat_grid_final$OtherBuilt
 dat_grid_final$GrassSoilSum <- dat_grid_final$ModGrassHerb + dat_grid_final$Soil
+dat_grid_final$housing_lowdensity <- dat_grid_final$single_detached + dat_grid_final$semi_detached + dat_grid_final$row_houses ### rowhouses may need to be removed, because vancouver doesn't uniformly service ALL of these
+dat_grid_final$housing_highdensity <- dat_grid_final$apt_flat + dat_grid_final$low_rise + dat_grid_final$high_rise
+dat_grid_final$pct_housing_notsuitable <- dat_grid_final$pct_housing_notsuitable/100
+dat_grid_final$pct_rent_thirty <- dat_grid_final$pct_rent_thirty/100
+dat_grid_final$pct_rent_subsidized <- dat_grid_final$pct_rent_subsidized/100
+dat_grid_final$poorservice_housing <- dat_grid_final$rent_pct + dat_grid_final$pct_housing_notsuitable + dat_grid_final$pct_rent_thirty
 
 dat_grid_final <- dat_grid_final %>%
   mutate(across(where(is.numeric), ~replace_na(., 0)))
@@ -817,5 +862,27 @@ save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_mods_750
 }
 
 
+if (gen_center_std) {
+
+dat_clean <- na.omit(dat_grid_final)
+# Extract geometry and data separately
+geom <- st_geometry(dat_clean)
+data_only <- st_drop_geometry(dat_clean)
+# Identify columns to scale (exclude ID columns etc.)
+cols_to_scale <- setdiff(names(data_only), c("site", "grid_id"))  # adjust as needed
+data_only <- as.data.frame(st_drop_geometry(dat_clean))
+# Scale those columns safely
+data_only[cols_to_scale] <- lapply(data_only[cols_to_scale], scale)
+# Recombine scaled data with geometry
+dat_scaled <- st_sf(data_only, geometry = st_geometry(dat_clean))
+dat_scaled$site_id <- as.integer(factor(dat_scaled$site))
+save(dat_scaled, file = here("data", "dat_scaled_750.Rdata"))
+
+
+
+} else {
+  ## object called "dat_scaled"
+  load(file = here("data", "dat_scaled_750.Rdata"))
+}
 
 

@@ -17,15 +17,10 @@ my_data <- my_data[, colSums(is.na(my_data)) == 0]  # Remove NA columns
 
 
 # Perform PCA
-pca_result <- prcomp(my_data[,-c(1,82)]) ### remove first and last columns
+pca_result <- prcomp(my_data[,-c(1,84,87)]) ### remove first and last columns
 
 # Summarize the PCA result
 summary(pca_result)
-
-# Plot the PCA result with the grouping variable
-autoplot(pca_result, data = my_data, colour = 'Name',) + 
-  labs(title = "PCA Plot with Grouping", x = "PC1", y = "PC2") +
-  theme_minimal()
 
 
 # Extract proportion of variance explained
@@ -135,7 +130,7 @@ pca1 <- ggplot() +
 
 
 # Specify the file path where you want to save the PDF
-pdf_file <- here("figures", "pca_12.pdf")
+pdf_file <- here("figs", "pca_12.pdf")
 
 # Open a PDF graphics device
 pdf(pdf_file)
