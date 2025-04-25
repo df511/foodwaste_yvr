@@ -44,11 +44,228 @@ here()
 ### import empirical data
 ```{r}
 ## read empirical data
-load(file = here("data", "dat_fw_demo_lc_retail_shelters_mods_750.Rdata"))
+load(file = here("data", "dat_fw_demo_lc_retail_shelters_roads_mods_750.Rdata"))
 dat_clean <- na.omit(dat_grid_final)
 load(file = here("data", "dat_scaled_750.Rdata"))
 
+load(file = here("data", "dat_no_ub_scaled_750.Rdata"))
+load(file = here("data", "dat_no_ub_750.Rdata"))
+
+
 ```
+
+
+
+
+###########
+### Two predictors in ZILN
+## Three in Bernoulli
+## hierarchy introduced
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_scaled),
+  J = 13,
+  site_id = dat_scaled$site_id,
+  X1 = dat_scaled$rent_pct,
+  X2 = dat_scaled$nearest_food_retail,
+  P1 = dat_scaled$NaturalVegSum,
+  P2 = dat_scaled$nearest_food_retail,
+  P3 = dat_clean$service_road_bool,
+  fw_score_weighted = dat_clean$fw_score_weighted
+)
+```
+
+```{r}
+fit_hier_A_rent_retail_B_natveg_retail_roadbool <- stan(
+  file = here("src","fw_hier_2pred_ZILN_3pred_bern.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+save(fit_hier_A_rent_retail_B_natveg_retail_roadweights, file = here("data","fit_hier_A_rent_retail_B_natveg_retail_roadweights.Rdata"))
+```
+```{r}
+# Extract samples
+posterior_samples <- rstan::extract(fit_hier_A_rent_retail_B_natveg_retail_roadweights)
+
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- posterior_samples$pi_pred # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
+pi_obs <- ifelse(dat_grid_final$fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+
+
+
+# Explore distributions
+hist(posterior_samples$mu0, breaks = 40, main = "mu0", col = "skyblue")
+hist(posterior_samples$tau_mu, breaks = 40, main = "tau_mu", col = "salmon")
+hist(posterior_samples$mu, breaks = 40, main = "mu = mu0 + tau_mu * mu_raw", col = "lightgreen")
+hist(posterior_samples$sigma, breaks = 40, main = "sigma", col = "lightblue")
+hist(posterior_samples$beta1, breaks = 40, main = "beta1", col = "pink")
+hist(posterior_samples$beta2, breaks = 40, main = "beta2", col = "purple")
+hist(posterior_samples$gamma, breaks = 40, main = "gamma", col = "yellow")
+hist(posterior_samples$delta1, breaks = 40, main = "delta1", col = "orange")
+hist(posterior_samples$delta2, breaks = 40, main = "delta2", col = "brown")
+hist(posterior_samples$delta3, breaks = 100, main = "delta3", col = "brown")
+
+
+
+
+ppc_dens_overlay(y_obs, y_rep[2000:2050,])  # Plot overlay of observed vs simulated densities
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Convert posterior predictive samples to a long format
+pi_pred_df <- as.data.frame(pi_pred)
+pi_pred_long <- pi_pred_df %>%
+  pivot_longer(cols = everything(), names_to = "Iteration", values_to = "pi_pred")
+# Calculate the mean of pi_obs
+mean_pi_obs <- mean(pi_obs, na.rm = TRUE)
+
+# Create the plot
+ggplot(pi_pred_long, aes(x = pi_pred)) +
+  geom_histogram(binwidth = 0.005, fill = "lightblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", linewidth = 1) +  # Add red vertical line
+  labs(title = "Posterior Predictive Check for pi",
+       x = "Predicted pi",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+```{r}
+#y_obs: your observed data
+# y_rep: posterior predictive draws (matrix), each row is a draw, columns = N observations
+
+# Function to compute proportion of zeros
+prop_zeros <- function(y) mean(y == 0)
+
+# Compute proportion of zeros for each posterior predictive draw
+prop_zeros_sim <- apply(y_rep, 1, prop_zeros)
+
+# Compute proportion of zeros in observed data
+prop_zeros_obs <- mean(y_obs == 0)
+
+# Plot
+ppc_stat(y = y_obs, yrep = y_rep, stat = "prop_zeros") +
+  geom_vline(xintercept = prop_zeros_obs, color = "red", linetype = "dashed", size = 1) +
+  labs(title = "Posterior Predictive Check: Proportion of Zeros",
+       x = "Proportion Zero", y = "Frequency") +
+  theme_minimal()
+
+```
+
+```{r}
+summary(y_rep[1:11696000])
+summary(dat_clean$fw_score_weighted)
+summary(y_obs)
+summary(pi_obs)
+summary(pi_pred[1:11696000])
+```
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means",breaks = 40)
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+```{r}
+# Convert y_rep to data frame and add draw number
+y_rep_df <- as.data.frame(y_rep) %>%
+  mutate(draw = row_number())
+
+site_id <- dat_scaled$site_id  # Or however it's stored in your data
+
+site_legend <- data.frame(
+  site = dat_scaled$site,
+  site_id = dat_scaled$site_id
+)
+
+site_legend_unique <- unique(site_legend)
+site_legend_unique <- site_legend_unique[order(site_legend_unique$site_id), ]
+
+
+# Pivot to long format
+y_rep_long <- y_rep_df %>%
+  tidyr::pivot_longer(-draw, names_to = "obs", values_to = "y") %>%
+  mutate(obs = as.integer(str_remove(obs, "^V")),
+         site = site_id[obs])
+
+site_means <- y_rep_long %>%
+  group_by(draw, site) %>%
+  summarise(mean_y = mean(y), .groups = "drop")
+
+ggplot(site_means, aes(x = factor(site), y = mean_y)) +
+  geom_boxplot(fill = "skyblue", alpha = 0.7) +
+  labs(title = "Posterior Predictive Means per Site",
+       x = "Site",
+       y = "Mean Predicted Food Waste") +
+  theme_minimal()
+
+
+ggplot(site_means, aes(x = factor(site), y = mean_y)) +
+  geom_boxplot(fill = "skyblue", alpha = 0.7) +
+  scale_x_discrete(
+    labels = site_legend_unique$site
+  ) +
+  labs(title = "Posterior Predictive Means per Site",
+       x = "Site",
+       y = "Mean Predicted Food Waste") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Optional for readability
+
+
+# Compute overall means per site to reorder
+site_order <- site_means %>%
+  group_by(site) %>%
+  summarise(overall_mean = mean(mean_y), .groups = "drop") %>%
+  arrange(desc(overall_mean)) %>%  # Order in descending order
+  mutate(site = factor(site, levels = site))  # ensures the order is preserved
+
+# Join ordered factor levels to site_means
+site_means <- site_means %>%
+  mutate(site = factor(site, levels = site_order$site))
+
+# Make sure site_legend_unique has the correct order
+site_legend_unique <- site_legend_unique %>%
+  mutate(site_id = as.integer(site_id)) %>%
+  arrange(match(site_id, levels(site_means$site)))
+
+# Plot with violin and mean line
+ggplot(site_means, aes(x = site, y = mean_y)) +
+  geom_violin(fill = "skyblue", alpha = 0.7, scale = "width", trim = FALSE) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "red") +
+  scale_x_discrete(labels = site_legend_unique$site) +
+  labs(
+    title = "Posterior Predictive Means per Site (Ordered by Mean)",
+    x = "Site",
+    y = "Mean Predicted Food Waste"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+
+
+
 
 ###########
 ### Three predictors in ZILN
@@ -66,7 +283,7 @@ stan_data <- list(
   X1 = dat_scaled$rent_pct,
   X2 = dat_scaled$nearest_food_retail,
   X3 = dat_scaled$,
-  P1 = dat_scaled$NaturalVegSum,
+  P1 = dat_scaled,
   fw_score_weighted = dat_clean$fw_score_weighted
 )
 ```
@@ -264,16 +481,16 @@ stan_data <- list(
   site_id = dat_scaled$site_id,
   X1 = dat_scaled$rent_pct,
   X2 = dat_scaled$nearest_food_retail,
-  X3 = dat_scaled$pop_km,
-  P1 = dat_scaled$nearest_food_retail,
-  P2 = dat_scaled$NaturalVegSum,
+  X3 = dat_scaled$pct_rent_subsidized,
+  P1 = dat_scaled$NaturalVegSum,
+  P2 = dat_scaled$nearest_food_retail,
   fw_score_weighted = dat_clean$fw_score_weighted
 )
 ```
 
 ```{r}
-fit_hier_A_rent_retail_popkm_B_foodretail_natveg <- stan(
-  file = here("src","fw_hier_3pred_ZILN_2pred_bern.stan"),  # Path to the Stan model
+fit_hier_A_rent_retail_pctsubsidized_int_B_natveg_retail <- stan(
+  file = here("src","fw_hier_3pred+int_ZILN_2pred_bern.stan"),  # Path to the Stan model
   data = stan_data, 
   chains = 4, 
   iter = 2000, 
@@ -281,12 +498,12 @@ fit_hier_A_rent_retail_popkm_B_foodretail_natveg <- stan(
 ```
 
 ```{r}
-save(fit_hier_A_rent_retail_popkm_B_foodretail_natveg, file = here("data","fit_hier_A_rent_retail_popkm_B_foodretail_natveg.Rdata"))
+save(fit_hier_A_rent_retail_pctsubsidized_int_B_natveg_retail, file = here("data","fit_hier_A_rent_retail_pctsubsidized_int_B_natveg_retail.Rdata"))
 ```
 
 ```{r}
 # Extract samples
-posterior_samples <- rstan::extract(fit_hier_A_rent_retail_popkm_B_foodretail_natveg)
+posterior_samples <- rstan::extract(fit_hier_A_rent_retail_pctsubsidized_B_natveg_retail)
 
 # Extract posterior samples
 y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
@@ -304,6 +521,7 @@ hist(posterior_samples$sigma, breaks = 40, main = "sigma", col = "lightblue")
 hist(posterior_samples$beta1, breaks = 40, main = "beta1", col = "pink")
 hist(posterior_samples$beta2, breaks = 40, main = "beta2", col = "purple")
 hist(posterior_samples$beta3, breaks = 40, main = "beta3", col = "magenta")
+#hist(posterior_samples$beta_int, breaks = 40, main = "beta_int", col = "purple4")
 hist(posterior_samples$gamma, breaks = 40, main = "gamma", col = "yellow")
 hist(posterior_samples$delta1, breaks = 40, main = "delta1", col = "orange")
 hist(posterior_samples$delta2, breaks = 40, main = "delta2", col = "brown")
@@ -456,7 +674,49 @@ ggplot(site_means, aes(x = site, y = mean_y)) +
 
 ```
 ```{r}
-launch_shinystan(fit_hier_A_rent_retail_popkm_B_foodretail_natveg)
+## weird predictor vals
+
+dat_scaled_no0s <- dat_scaled %>%
+  filter(fw_score_weighted > -0.1852)
+
+
+dat_clean_no0s <- dat_clean %>%
+  filter(fw_score_weighted > 0)
+
+
+plot( dat_scaled_no0s$nearest_food_retail, dat_scaled_no0s$fw_score_weighted, main = "no 0s")
+
+plot( dat_scaled$nearest_food_retail, dat_scaled$fw_score_weighted, main = "All data")
+
+
+
+lm(dat_clean_no0s$fw_score_weighted ~ dat_scaled_no0s$pct_rent_subsidized)
+
+
+lm(dat_scaled$fw_score_weighted ~ dat_scaled$nearest_food_retail)
+
+lm(dat_scaled_no0s$fw_score_weighted ~ dat_scaled_no0s$nearest_food_retail)
+
+
+lm(dat_scaled$fw_score_weighted ~ dat_scaled$nearest_food_retail)
+lm(dat_scaled_no0s$fw_score_weighted ~ dat_scaled_no0s$nearest_food_retail)
+
+lm(dat_scaled$fw_score_weighted ~ dat_scaled$nearest_food_retail + dat_scaled$rent_pct)
+lm(dat_scaled_no0s$fw_score_weighted ~ dat_scaled_no0s$nearest_food_retail + dat_scaled_no0s$rent_pct)
+
+lm(dat_scaled_no0s$fw_score_weighted ~ dat_scaled_no0s$nearest_food_retail + dat_scaled_no0s$rent_pct + dat_scaled_no0s$pop_km)
+
+
+lm(dat_scaled_no0s$fw_score_weighted ~ dat_scaled_no0s$nearest_food_retail)
+lm(dat_scaled_no0s$fw_score_weighted ~ dat_scaled_no0s$nearest_food_retail + dat_scaled_no0s$rent_pct)
+
+```
+```{r}
+print(summary(fit_hier_A_rent_retail_pctsubsidized_int_B_natveg_retail))
+print(summary(fit_hier_A_rent_retail_pctsubsidized_B_natveg_retail))
+```
+```{r}
+launch_shinystan(fit_hier_A_rent_retail_shelter_B_natveg_retail)
 ```
 
 
@@ -667,15 +927,15 @@ stan_data <- list(
   J = 13,
   site_id = dat_scaled$site_id,
   X1 = dat_scaled$rent_pct,
-  X2 = dat_scaled$nearest_food_retail,
-  P1 = dat_scaled$pop_km,
-  P2 = dat_scaled$NaturalVegSum,
+  X2 = as.vector(scale(log(dat_clean$nearest_food_retail+0.000000000000001))),
+  P1 = dat_scaled$NaturalVegSum,
+  P2 = dat_scaled$nearest_food_retail,
   fw_score_weighted = dat_clean$fw_score_weighted
 )
 ```
 
 ```{r}
-fit_hier_A_rent_retail_B_popkm_natveg <- stan(
+fit_hier_A_rent_logretail_B_natveg_retail <- stan(
   file = here("src","fw_hier_2pred_ZILN_2pred_bern.stan"),  # Path to the Stan model
   data = stan_data, 
   chains = 4, 
@@ -684,31 +944,32 @@ fit_hier_A_rent_retail_B_popkm_natveg <- stan(
 ```
 
 ```{r}
-save(fit_hier_A_rent_retail_B_popkm_natveg, file = here("data","fit_hier_A_rent_retail_B_popkm_natveg.Rdata"))
-```
+save(fit_hier_A_rent_logretail_B_natveg_retail, file = here("data","fit_hier_A_rent_logretail_B_natveg_retail.Rdata"))
 
+load(file = here("data","fit_hier_A_rent_retail_B_natveg_retail.Rdata"))
+```
 ```{r}
+# Extract samples
+posterior_samples <- rstan::extract(fit_hier_A_rent_retail_B_natveg_retail)
+
 # Extract posterior samples
-y_rep <- rstan::extract(fit_hier_A_rent_retail_B_popkm_natveg)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
-pi_pred <- rstan::extract(fit_hier_A_rent_retail_B_popkm_natveg)$pi_pred  # Change "y_rep" based on how you named your predicted values
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- posterior_samples$pi_pred # Change "y_rep" based on how you named your predicted values
 y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
 pi_obs <- ifelse(dat_grid_final$fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
 
 
-# Extract samples
-prior_samples <- rstan::extract(fit_hier_A_rent_retail_B_popkm_natveg)
 
 # Explore distributions
-hist(prior_samples$mu0, breaks = 40, main = "mu0", col = "skyblue")
-hist(prior_samples$tau_mu, breaks = 40, main = "tau_mu", col = "salmon")
-hist(prior_samples$mu, breaks = 40, main = "mu = mu0 + tau_mu * mu_raw", col = "lightgreen")
-hist(prior_samples$sigma, breaks = 40, main = "sigma", col = "lightblue")
-hist(prior_samples$beta1, breaks = 40, main = "beta1", col = "pink")
-hist(prior_samples$beta2, breaks = 40, main = "beta2", col = "purple")
-hist(prior_samples$gamma, breaks = 40, main = "gamma", col = "yellow")
-hist(prior_samples$delta1, breaks = 40, main = "delta1", col = "orange")
-hist(prior_samples$delta2, breaks = 40, main = "delta2", col = "brown")
-
+hist(posterior_samples$mu0, breaks = 40, main = "mu0", col = "skyblue")
+hist(posterior_samples$tau_mu, breaks = 40, main = "tau_mu", col = "salmon")
+hist(posterior_samples$mu, breaks = 40, main = "mu = mu0 + tau_mu * mu_raw", col = "lightgreen")
+hist(posterior_samples$sigma, breaks = 40, main = "sigma", col = "lightblue")
+hist(posterior_samples$beta1, breaks = 40, main = "beta1", col = "pink")
+hist(posterior_samples$beta2, breaks = 40, main = "beta2", col = "purple")
+hist(posterior_samples$gamma, breaks = 40, main = "gamma", col = "yellow")
+hist(posterior_samples$delta1, breaks = 40, main = "delta1", col = "orange")
+hist(posterior_samples$delta2, breaks = 40, main = "delta2", col = "brown")
 
 
 
@@ -857,9 +1118,215 @@ ggplot(site_means, aes(x = site, y = mean_y)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 ```{r}
-launch_shinystan(fit_hier_A_rent_retail_B_popkm_natveg)
+launch_shinystan(fit_hier_A_rent_retail_B_natveg_retail)
 ```
 
+
+
+
+
+
+
+###########
+### Two predictors in ZILN
+## One in Bernoulli
+### changed Bernoulli
+## hierarchy introduced
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_no_ub_scaled),
+  J = 12,
+  site_id = dat_no_ub_scaled$site_id,
+  X1 = dat_no_ub_scaled$rent_pct,
+  X2 = dat_no_ub_scaled$nearest_food_retail,
+  P1 = dat_no_ub_scaled$service_road_weight,
+  fw_score_weighted = dat_no_ub$fw_score_weighted
+)
+```
+
+```{r}
+fit_hier_A_rent_food_B_roadweight_noub <- stan(
+  file = here("src","fw_hier_2pred_ZILN_1pred_bern.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+save(fit_hier_A_rent_food_B_roadweight_noub, file = here("data","fit_hier_A_rent_food_B_roadweight_noub.Rdata"))
+```
+```{r}
+# Extract samples
+posterior_samples <- rstan::extract(fit_hier_A_rent_food_B_roadweight_noub)
+
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- posterior_samples$pi_pred # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_no_ub$fw_score_weighted  # Replace with actual observed data
+pi_obs <- ifelse(dat_no_ub$fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+
+
+
+# Explore distributions
+hist(posterior_samples$mu0, breaks = 40, main = "mu0", col = "skyblue")
+hist(posterior_samples$tau_mu, breaks = 40, main = "tau_mu", col = "salmon")
+hist(posterior_samples$mu, breaks = 40, main = "mu = mu0 + tau_mu * mu_raw", col = "lightgreen")
+hist(posterior_samples$sigma, breaks = 40, main = "sigma", col = "lightblue")
+hist(posterior_samples$beta1, breaks = 40, main = "beta1", col = "pink")
+hist(posterior_samples$beta2, breaks = 40, main = "beta2", col = "purple")
+hist(posterior_samples$gamma, breaks = 40, main = "gamma", col = "yellow")
+hist(posterior_samples$delta1, breaks = 40, main = "delta1", col = "orange")
+
+
+
+
+ppc_dens_overlay(y_obs, y_rep[2000:2050,])  # Plot overlay of observed vs simulated densities
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Convert posterior predictive samples to a long format
+pi_pred_df <- as.data.frame(pi_pred)
+pi_pred_long <- pi_pred_df %>%
+  pivot_longer(cols = everything(), names_to = "Iteration", values_to = "pi_pred")
+# Calculate the mean of pi_obs
+mean_pi_obs <- mean(pi_obs, na.rm = TRUE)
+
+# Create the plot
+ggplot(pi_pred_long, aes(x = pi_pred)) +
+  geom_histogram(binwidth = 0.005, fill = "lightblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", linewidth = 1) +  # Add red vertical line
+  labs(title = "Posterior Predictive Check for pi",
+       x = "Predicted pi",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+```{r}
+#y_obs: your observed data
+# y_rep: posterior predictive draws (matrix), each row is a draw, columns = N observations
+
+# Function to compute proportion of zeros
+prop_zeros <- function(y) mean(y == 0)
+
+# Compute proportion of zeros for each posterior predictive draw
+prop_zeros_sim <- apply(y_rep, 1, prop_zeros)
+
+# Compute proportion of zeros in observed data
+prop_zeros_obs <- mean(y_obs == 0)
+
+# Plot
+ppc_stat(y = y_obs, yrep = y_rep, stat = "prop_zeros") +
+  geom_vline(xintercept = prop_zeros_obs, color = "red", linetype = "dashed", size = 1) +
+  labs(title = "Posterior Predictive Check: Proportion of Zeros",
+       x = "Proportion Zero", y = "Frequency") +
+  theme_minimal()
+
+```
+
+```{r}
+summary(y_rep[1:11696000])
+summary(dat_no_ub$fw_score_weighted)
+summary(y_obs)
+summary(pi_obs)
+summary(pi_pred[1:11696000])
+```
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means",breaks = 40)
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+```{r}
+# Convert y_rep to data frame and add draw number
+y_rep_df <- as.data.frame(y_rep) %>%
+  mutate(draw = row_number())
+
+site_id <- dat_no_ub_scaled$site_id  # Or however it's stored in your data
+
+site_legend <- data.frame(
+  site = dat_no_ub_scaled$site,
+  site_id = dat_no_ub_scaled$site_id
+)
+
+site_legend_unique <- unique(site_legend)
+site_legend_unique <- site_legend_unique[order(site_legend_unique$site_id), ]
+
+
+# Pivot to long format
+y_rep_long <- y_rep_df %>%
+  tidyr::pivot_longer(-draw, names_to = "obs", values_to = "y") %>%
+  mutate(obs = as.integer(str_remove(obs, "^V")),
+         site = site_id[obs])
+
+site_means <- y_rep_long %>%
+  group_by(draw, site) %>%
+  summarise(mean_y = mean(y), .groups = "drop")
+
+# ggplot(site_means, aes(x = factor(site), y = mean_y)) +
+#   geom_boxplot(fill = "skyblue", alpha = 0.7) +
+#   labs(title = "Posterior Predictive Means per Site",
+#        x = "Site",
+#        y = "Mean Predicted Food Waste") +
+#   theme_minimal()
+# 
+# 
+# ggplot(site_means, aes(x = factor(site), y = mean_y)) +
+#   geom_boxplot(fill = "skyblue", alpha = 0.7) +
+#   scale_x_discrete(
+#     labels = site_legend_unique$site
+#   ) +
+#   labs(title = "Posterior Predictive Means per Site",
+#        x = "Site",
+#        y = "Mean Predicted Food Waste") +
+#   theme_minimal() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Optional for readability
+
+
+# Compute overall means per site to reorder
+site_order <- site_means %>%
+  group_by(site) %>%
+  summarise(overall_mean = mean(mean_y), .groups = "drop") %>%
+  arrange(desc(overall_mean)) %>%  # Order in descending order
+  mutate(site = factor(site, levels = site))  # ensures the order is preserved
+
+# Join ordered factor levels to site_means
+site_means <- site_means %>%
+  mutate(site = factor(site, levels = site_order$site))
+
+# Make sure site_legend_unique has the correct order
+site_legend_unique <- site_legend_unique %>%
+  mutate(site_id = as.integer(site_id)) %>%
+  arrange(match(site_id, levels(site_means$site)))
+
+# Plot with violin and mean line
+ggplot(site_means, aes(x = site, y = mean_y)) +
+  geom_violin(fill = "skyblue", alpha = 0.7, scale = "width", trim = FALSE) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "red") +
+  scale_x_discrete(labels = site_legend_unique$site) +
+  labs(
+    title = "Posterior Predictive Means per Site (Ordered by Mean)",
+    x = "Site",
+    y = "Mean Predicted Food Waste"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
 
 
 
@@ -881,7 +1348,7 @@ stan_data <- list(
   X1 = dat_scaled$single_detached,
   X2 = dat_scaled$nearest_food_retail,
   X3 = dat_scaled$household_income,
-  X4 = dat_scaled$rent_pct,
+  X4 = dat_scaled$rent_pct*,
   P1 = dat_scaled$pop_km,
   P2 = dat_scaled$NaturalVegSum,
   fw_score_weighted = dat_clean$fw_score_weighted
@@ -889,7 +1356,7 @@ stan_data <- list(
 ```
 
 ```{r}
-fit_hier_A_housing_foodretail_income_rent_B_popkm_natveg <- stan(
+fit_hier_A_rent_retail_pctnotsuitable_int_B_natveg_retail <- stan(
   file = here("src","fw_hier_4pred_ZILN_2pred_bern.stan"),  # Path to the Stan model
   data = stan_data, 
   chains = 4, 
@@ -1544,16 +2011,16 @@ stan_data <- list(
   N = nrow(dat_scaled),
   J = 13,
   site_id = dat_scaled$site_id,
-  X1 = dat_scaled$poorservice_housing,
+  X1 = dat_scaled$rent_pct,
   X2 = dat_scaled$nearest_food_retail,
   P1 = dat_scaled$NaturalVegSum,
-  P2 = dat_scaled$nearest_food_retail,
+  P2 = dat_scaled$service_road_weight,
   fw_score_weighted = dat_clean$fw_score_weighted
 )
 ```
 
 ```{r}
-fit_hier_A_poorservice_foodretail_B_natveg_foodretail <- stan(
+fit_hier_A_rent_foodretail_B_natveg_roadweight <- stan(
   file = here("src","fw_hier_2pred_ZILN_2pred_bern.stan"),  # Path to the Stan model
   data = stan_data, 
   chains = 4, 
@@ -1563,12 +2030,12 @@ fit_hier_A_poorservice_foodretail_B_natveg_foodretail <- stan(
 
 
 ```{r}
-save(fit_hier_A_poorservice_foodretail_B_natveg_foodretail, file = here("data","fit_hier_A_poorservice_foodretail_B_natveg_foodretail.Rdata"))
+save(fit_hier_A_rent_foodretail_B_natveg_roadweight, file = here("data","fit_hier_A_rent_foodretail_B_natveg_roadweight.Rdata"))
 ```
 
 ```{r}
 # Extract samples
-posterior_samples <- rstan::extract(fit_hier_A_poorservice_foodretail_B_natveg_foodretail)
+posterior_samples <- rstan::extract(fit_hier_A_rent_foodretail_B_natveg_roadweight)
 
 # Extract posterior samples
 y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values

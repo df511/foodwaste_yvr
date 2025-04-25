@@ -1,0 +1,244 @@
+---
+title: "map_projections"
+output: html_document
+date: '2025-04-15'
+---
+
+```{r setup, include=FALSE}
+### load model
+load(here("data","fit_hier_A_rent_retail_pctsubsidized_B_natveg_retail.Rdata"))
+
+```
+
+```{r}
+# Get fitted (mean posterior estimates)
+posterior_samples <- rstan::extract(fit_hier_A_rent_retail_pctsubsidized_B_natveg_retail)
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+
+fitted_vals <- apply(y_rep, 2, mean)  # average over iterations
+
+dat_scaled$predicted_value <- fitted_vals
+
+
+
+# OR: use posterior_epred or posterior_predict for full draws
+# posterior_epred gives expected values (mean over posterior), posterior_predict gives simulated outcomes
+
+```
+
+```{r}
+# Define output file name and resolution
+pdf(here("figs","fw_pred_750m.pdf"), width = 12, height = 8)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = dat_scaled$predicted_value), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Predicted Food Waste Vals") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+```
+
+
+```{r}
+# Get fitted (mean posterior estimates)
+posterior_samples <- rstan::extract(fit_hier_A_rent_food_B_roadbool)
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+
+fitted_vals <- apply(y_rep, 2, mean)  # average over iterations
+
+dat_scaled$predicted_value <- fitted_vals
+
+
+
+# OR: use posterior_epred or posterior_predict for full draws
+# posterior_epred gives expected values (mean over posterior), posterior_predict gives simulated outcomes
+
+```
+
+```{r}
+# Define output file name and resolution
+pdf(here("figs","fw_pred_roadbool_750m.pdf"), width = 12, height = 8)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = log(dat_scaled$predicted_value)), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Predicted Food Waste Vals") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+```
+
+
+```{r}
+# Get fitted (mean posterior estimates)
+posterior_samples <- rstan::extract(fit_hier_A_rent_food_B_roadweight)
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+
+fitted_vals <- apply(y_rep, 2, mean)  # average over iterations
+
+dat_scaled$predicted_value <- fitted_vals
+
+
+
+# OR: use posterior_epred or posterior_predict for full draws
+# posterior_epred gives expected values (mean over posterior), posterior_predict gives simulated outcomes
+
+```
+
+```{r}
+# Define output file name and resolution
+pdf(here("figs","fw_pred_roadweight_750m.pdf"), width = 12, height = 8)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = log(dat_scaled$predicted_value)), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Predicted Food Waste Vals") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+```
+
+```{r}
+# Get fitted (mean posterior estimates)
+posterior_samples <- rstan::extract(fit_hier_A_rent_foodretail_B_natveg_roadbool)
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+
+fitted_vals <- apply(y_rep, 2, mean)  # average over iterations
+
+dat_scaled$predicted_value <- fitted_vals
+
+
+
+# OR: use posterior_epred or posterior_predict for full draws
+# posterior_epred gives expected values (mean over posterior), posterior_predict gives simulated outcomes
+
+```
+
+```{r}
+# Define output file name and resolution
+pdf(here("figs","fw_pred_natveg_roadbool_750m.pdf"), width = 12, height = 8)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = dat_scaled$predicted_value), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Predicted Food Waste Vals") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+```
+
+
+
+```{r}
+# Get fitted (mean posterior estimates)
+posterior_samples <- rstan::extract(fit_hier_A_rent_foodretail_B_foodretail_roadweight)
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+
+fitted_vals <- apply(y_rep, 2, mean)  # average over iterations
+
+dat_scaled$predicted_value <- fitted_vals
+
+
+
+# OR: use posterior_epred or posterior_predict for full draws
+# posterior_epred gives expected values (mean over posterior), posterior_predict gives simulated outcomes
+
+```
+
+```{r}
+# Define output file name and resolution
+pdf(here("figs","fw_pred_foodretail_roadweight_750m.pdf"), width = 12, height = 8)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = dat_scaled$predicted_value), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Predicted Food Waste Vals") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+```
+
+
+
+```{r}
+# Get fitted (mean posterior estimates)
+posterior_samples <- rstan::extract(fit_hier_A_rent_foodretail_B_foodretail_roadweight)
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+
+fitted_vals <- apply(y_rep, 2, mean)  # average over iterations
+
+dat_scaled$predicted_value <- fitted_vals
+
+
+
+# OR: use posterior_epred or posterior_predict for full draws
+# posterior_epred gives expected values (mean over posterior), posterior_predict gives simulated outcomes
+
+```
+
+```{r}
+# Define output file name and resolution
+pdf(here("figs","fw_pred_natveg_roadweight_750m.pdf"), width = 12, height = 8)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = dat_scaled$predicted_value), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Predicted Food Waste Vals") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+```
+
+
+
+
+```{r}
+# Get fitted (mean posterior estimates)
+posterior_samples <- rstan::extract(fit_hier_A_rent_food_B_roadweight)
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+
+fitted_vals <- apply(y_rep, 2, mean)  # average over iterations
+
+dat_scaled$predicted_value <- fitted_vals
+
+
+
+# OR: use posterior_epred or posterior_predict for full draws
+# posterior_epred gives expected values (mean over posterior), posterior_predict gives simulated outcomes
+
+```
+
+```{r}
+# Define output file name and resolution
+pdf(here("figs","fw_pred_roadweight_750m.pdf"), width = 12, height = 8)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = dat_scaled$predicted_value), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Predicted Food Waste Vals") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+```

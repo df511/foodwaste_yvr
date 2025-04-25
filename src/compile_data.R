@@ -38,9 +38,9 @@ library(progressr)
 #### set all stages prior to the focal stage to FALSE
 
 ### Module 1: gen grids
-gen_grids <- FALSE  # Change to FALSE to load data instead
+gen_grids <- TRUE  # Change to FALSE to load data instead
 ### Module 2: gen food waste
-gen_foodwaste <- FALSE  # Change to FALSE to load data instead
+gen_foodwaste <- TRUE  # Change to FALSE to load data instead
 ### Module 3: gen Canadian census dat (demographics)
 gen_demog <- TRUE  # Change to FALSE to load data instead
 ### Module 4: read in land cover data, calculate proportion of cell containing each of 13 land cover classes
@@ -49,11 +49,11 @@ gen_lc <- TRUE
 gen_foodretail <- TRUE
 ### Module 6: read in food retail location data
 gen_shelters <- TRUE
-# ### Module 7: read in property values from tax data
-# gen_propvals <- TRUE
-### Module 7: read in property values from tax data
-gen_finalmods <- TRUE
+### Module 7: read in food retail location data
+gen_roads <- TRUE
 ### Module 8: read in property values from tax data
+gen_finalmods <- TRUE
+### Module 9: read in property values from tax data
 gen_center_std <- TRUE
 
 
@@ -71,25 +71,51 @@ if (gen_grids) {
   
   #### build functions
   
-  # Function to create an internally fitting grid for each polygon with its site name
-  create_internal_grid <- function(polygon, cell_size, site_name) {
-    bbox <- st_bbox(polygon)
+  # # Function to create an internally fitting grid for each polygon with its site name
+  # create_internal_grid <- function(polygon, cell_size, site_name) {
+  #   bbox <- st_bbox(polygon)
+  #   
+  #   # Generate grid in metric units
+  #   grid <- st_make_grid(polygon, cellsize = cell_size, square = TRUE, 
+  #                        offset = c(bbox["xmin"], bbox["ymin"]))  
+  #   
+  #   # Convert to sf object
+  #   grid_sf <- st_sf(geometry = grid)
+  #   
+  #   # Keep only full grid cells within the polygon
+  #   grid_inside <- grid_sf[st_within(grid_sf, polygon, sparse = FALSE), ]
+  #   
+  #   # Add site name as an attribute
+  #   grid_inside$name <- site_name
+  #   
+  #   return(grid_inside)
+  # } 
+  # 
+  
+  
+  create_internal_grid <- function(polygon, cell_size, site_name, overlap_buffer = 5) {
+    # Buffer outward by the overlap distance
+    polygon_buffered <- st_buffer(polygon, overlap_buffer)
     
-    # Generate grid in metric units
-    grid <- st_make_grid(polygon, cellsize = cell_size, square = TRUE, 
+    bbox <- st_bbox(polygon_buffered)
+    
+    # Generate grid with the buffered polygon
+    grid <- st_make_grid(polygon_buffered, cellsize = cell_size, square = TRUE, 
                          offset = c(bbox["xmin"], bbox["ymin"]))  
     
-    # Convert to sf object
     grid_sf <- st_sf(geometry = grid)
     
-    # Keep only full grid cells within the polygon
-    grid_inside <- grid_sf[st_within(grid_sf, polygon, sparse = FALSE), ]
+    # Option 1: Keep grid cells that intersect (i.e., touch or overlap) original polygon
+    grid_overlap <- grid_sf[st_intersects(grid_sf, polygon, sparse = FALSE), ]
     
-    # Add site name as an attribute
-    grid_inside$name <- site_name
+    # Option 2: OR keep all cells that intersect the buffered polygon (wider coverage)
+    # grid_overlap <- grid_sf[st_intersects(grid_sf, polygon_buffered, sparse = FALSE), ]
     
-    return(grid_inside)
-  } 
+    # Add site name
+    grid_overlap$name <- site_name
+    
+    return(grid_overlap)
+  }
   
   
   ###### read files
@@ -105,7 +131,7 @@ if (gen_grids) {
   
   strathcona <- st_read(here("data","sites","strathcona_final.kml"))
   plot(strathcona)
-  second_beach <- st_read(here("data","sites", "2nd_beach.kml"))
+  second_beach <- st_read(here("data","sites", "2nd_beach_edit.kml"))
   plot(second_beach)
   
   
@@ -150,13 +176,9 @@ if (gen_grids) {
   mean_cell_area <- mean(cell_areas)
   print(paste("Mean cell size:", mean_cell_area, "square meters"))
   
-  # # Plot results
-  # plot(st_geometry(sites_3857), col = "lightblue", border = "black")
-  # plot(st_geometry(final_grid), add = TRUE, border = "red")
-  # 
-  
+ 
   # Define output file name and resolution
-  pdf(here("figs","grid_plot_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+  pdf(here("figs","grid_plot_750m_buffered.pdf"), width = 80, height = 64)  # Adjust size as needed
   
   # Plot the grid inside polygons
   plot(st_geometry(sites_3857), col = "lightblue", border = "black")
@@ -422,53 +444,95 @@ census_vec <- list_census_vectors(dataset ="CA21")
 
 #read in census data via query of census mapper
 census_data <- get_census(dataset = 'CA21', regions = list(CSD = "5915022"), 
-                          
-                          vectors = c("v_CA21_1","v_CA21_906", "v_CA21_6",
-                                      "v_CA21_5808","v_CA21_5865", "v_CA21_4204",
-                                      "v_CA21_4238", "v_CA21_4239",
+                          vectors = c("v_CA21_1","v_CA21_906", "v_CA21_6", #population, median income, pop. density
+                                      "v_CA21_5808","v_CA21_5865", "v_CA21_4204", "v_CA21_4201",
+                                      "v_CA21_4238", "v_CA21_4239", "v_CA21_4237",
                                       "v_CA21_4875","v_CA21_4878", "v_CA21_4881",
                                       "v_CA21_4884", "v_CA21_4887", "v_CA21_4890",
                                       "v_CA21_4893", "v_CA21_4896", "v_CA21_4899",
                                       "v_CA21_4902", "v_CA21_4905", "v_CA21_4908",
                                       "v_CA21_4911","v_CA21_4914",
-                                      "v_CA21_9", "v_CA21_10",## gender
-                                      "v_CA21_4297", "v_CA21_4298", "v_CA21_4299", "v_CA21_4300","v_CA21_4314","v_CA21_4315", "v_CA21_4316", ##housing suitability, repairs...
+                                      "v_CA21_9", "v_CA21_10", "v_CA21_8", ## gender
+                                      "v_CA21_4297", "v_CA21_4298", "v_CA21_4299", "v_CA21_4300","v_CA21_4314","v_CA21_4315", "v_CA21_4316","v_CA21_4260", "v_CA21_4261","v_CA21_4272","v_CA21_4273","v_CA21_4274", ##housing suitability, repairs...
                                       "v_CA21_435","v_CA21_436","v_CA21_437","v_CA21_438", "v_CA21_439", "v_CA21_440", ##housing types; https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=144257
                                       "v_CA21_4392", "v_CA21_4401", "v_CA21_4407", "v_CA21_4410", ##immigration... citizens/non-citizens, non-immigrants, immigrants
-                                      "v_CA21_4923", "v_CA21_4938"), ### ethnicity, English, Chinese, re: Ley 1995
+                                      "v_CA21_4923", "v_CA21_4938", ### ethnicity, English, Chinese, re: Ley 1995
+                                      "v_CA21_507", "v_CA21_499", ### total one parent families, total families
+                                      "v_CA21_534", "v_CA21_510",## living alone, total persons in private households
+                                      "v_CA21_483", "v_CA21_486", "v_CA21_489","v_CA21_453", # Total Separated, Divorced, Widowed, out of all Marital status respondents
+                                      "v_CA21_6498", "v_CA21_6495", ## total employed out of all workforce
+                                      "v_CA21_5802", "v_CA21_5799", ## total no high school diploma or equivalent out of respondents
+                                      "v_CA21_452", # average household size
+                                      "v_CA21_4917", #parent vector (ethnic or cultural origin), then 
+                                      "v_CA21_5109", "v_CA21_5010", "v_CA21_5205", "v_CA21_4977", "v_CA21_5094", "v_CA21_5202", # Latin, Central or South American, n.o.s., Total African, n.o.s., Total West or Central Asian or Middle Eastern, n.o.s., Total European, n.o.s, Total South Asian, n.o.s,  Total East or Southeast Asian, n.o.s
+                                      "v_CA21_4389", "v_CA21_4404","v_CA21_4872", # total_citizen_Q, total_immigrant, total vis minority
+                                      "v_CA21_4968" #caucasian
+                          ),
                           labels = "detailed", geo_format = "sf", level = "DA")
 
+# 
+# var <- colnames(census_data[,43])
+# var <- var[1]
+# clean_var1 <- gsub("\\\\", "", var)
+# var <- colnames(census_data[,44])
+# var <- var[1]
+# clean_var2 <- gsub("\\\\", "", var)
+# var <- colnames(census_data[,45])
+# var <- var[1]
+# clean_var3 <- gsub("\\\\", "", var)
+# var <- colnames(census_data[,46])
+# var <- var[1]
+# clean_var4 <- gsub("\\\\", "", var)
+# var <- colnames(census_data[,47])
+# var <- var[1]
+# clean_var5 <- gsub("\\\\", "", var)
+# var <- colnames(census_data[,48])
+# var <- var[1]
+# clean_var6 <- gsub("\\\\", "", var)
+# var <- colnames(census_data[,49])
+# var <- var[1]
+# clean_var7 <- gsub("\\\\", "", var)
+# # var <- colnames(census_data[,50])
+# # var <- var[1]
+# # clean_var8 <- gsub("\\\\", "", var)
+# var <- colnames(census_data[,50])
+# var <- var[1]
+# clean_var8 <- gsub("\\\\", "", var)
+# var <- colnames(census_data[,51])
+# var <- var[1]
+# clean_var9 <- gsub("\\\\", "", var)
 
-var <- colnames(census_data[,41])
-var <- var[1]
-clean_var1 <- gsub("\\\\", "", var)
-var <- colnames(census_data[,42])
-var <- var[1]
-clean_var2 <- gsub("\\\\", "", var)
-var <- colnames(census_data[,43])
-var <- var[1]
-clean_var3 <- gsub("\\\\", "", var)
-var <- colnames(census_data[,44])
-var <- var[1]
-clean_var4 <- gsub("\\\\", "", var)
-var <- colnames(census_data[,45])
-var <- var[1]
-clean_var5 <- gsub("\\\\", "", var)
-var <- colnames(census_data[,46])
-var <- var[1]
-clean_var6 <- gsub("\\\\", "", var)
-var <- colnames(census_data[,47])
-var <- var[1]
-clean_var7 <- gsub("\\\\", "", var)
 
+var <- colnames(census_data[,83])
+var <- var[1]
+clean_var10 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,84])
+var <- var[1]
+clean_var11 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,85])
+var <- var[1]
+clean_var12 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,86])
+var <- var[1]
+clean_var13 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,87])
+var <- var[1]
+clean_var14 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,88])
+var <- var[1]
+clean_var15 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,89])
+var <- var[1]
+clean_var16 <- gsub("\\\\", "", var)
 
 #rename columns
 census_data <- census_data %>% 
   rename(household_income = `v_CA21_906: Median total income of household in 2020 ($)`,
          population = `v_CA21_1: Population, 2021`,
          minority_pop = `v_CA21_4875: Total visible minority population`,
-         black_pop = `v_CA21_4884: Black`, 
+         black_pop = `v_CA21_4884: Black`,
          indig_pop = `v_CA21_4204: Indigenous identity (39)`,
+         indig_respondents = `v_CA21_4201: Total - Indigenous identity for the population in private households`,
          pop_km = `v_CA21_6: Population density per square kilometre`,
          owners = `v_CA21_4238: Owner`,
          renters = `v_CA21_4239: Renter`,
@@ -480,39 +544,74 @@ census_data <- census_data %>%
          apt_flat = `v_CA21_438: Apartment or flat in a duplex`,
          low_rise = `v_CA21_439: Apartment in a building that has fewer than five storeys`,
          high_rise = `v_CA21_440: Apartment in a building that has five or more storeys`,
-         thirtyonshelter_notsuitable = !!sym(clean_var1),
-         thirtyonshelter_majorrepairs = !!sym(clean_var2),
-         notsuitable_majorrepairs = !!sym(clean_var3),
-         thirtyonshelter_notsuitable_majorepairs = !!sym(clean_var4),
-         pct_rent_subsidized = !!sym(clean_var5),
-         pct_rent_thirty = !!sym(clean_var6),
-         pct_housing_notsuitable = !!sym(clean_var7),
+         # # thirtyonshelter_notsuitable = !!sym(clean_var1),
+         # # thirtyonshelter_majorrepairs = !!sym(clean_var2),
+         # # notsuitable_majorrepairs = !!sym(clean_var3),
+         # # thirtyonshelter_notsuitable_majorepairs = !!sym(clean_var4),
+         # # pct_rent_subsidized = !!sym(clean_var5),
+         # # pct_rent_thirty = !!sym(clean_var6),
+         # # total_occupied_housing = !!sym(clean_var7),
+         # # #pct_housing_notsuitable = !!sym(clean_var7),
+         # # #total_occupied_housing = !!sym(clean_var8),
+         # # minor_repairs = !!sym(clean_var8),
+         # # major_repairs = !!sym(clean_var9),
          citizens = `v_CA21_4392: Canadian citizens`,
          non_citizens = `v_CA21_4401: Not Canadian citizens`,
-         non_immigrants = `v_CA21_4407: Non-immigrants`, 
+         non_immigrants = `v_CA21_4407: Non-immigrants`,
          immigrants = `v_CA21_4410: Immigrants`,
          English = `v_CA21_4923: English`,
-         Chinese = `v_CA21_4938: Chinese`
+         Chinese = `v_CA21_4938: Chinese`,
+         LCS_American = !!sym(clean_var10),
+         African = !!sym(clean_var11),
+         MidEast_WC_Asian = !!sym(clean_var12),
+         E_SE_Asian = !!sym(clean_var13),
+         European = !!sym(clean_var14),
+         Caucasian = !!sym(clean_var15),
+         S_Asian = !!sym(clean_var16)
          )
 
 #calculate percemtages of ethnicities per population and create new cols in df
-census_data$black_pct <- census_data$black_pop / census_data$population
-census_data$indig_pct <- census_data$indig_pop / census_data$population
-census_data$min_pct <- census_data$minority_pop / census_data$population
-census_data$own_pct <- census_data$owners / census_data$population
-census_data$rent_pct <- census_data$renters / census_data$population
-census_data$male_pct <- census_data$male / census_data$population
-census_data$female_pct <- census_data$female / census_data$population
-census_data$english_pct <- census_data$English / census_data$population
-census_data$chinese_pct <- census_data$Chinese / census_data$population
-census_data$citizen_pct <- census_data$citizens/ census_data$population
-census_data$noncitizen_pct <- census_data$non_citizens / census_data$population
-census_data$nonimmigrant_pct <- census_data$non_immigrants/ census_data$population
-census_data$immigrant_pct <- census_data$immigrants / census_data$population
-
+census_data$black_pct <- census_data$black_pop / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$chinese_pct <- census_data$`v_CA21_4881: Chinese` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$southasian_pct <- census_data$`v_CA21_4878: South Asian` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$filipino_pct <- census_data$`v_CA21_4887: Filipino` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$arab_pct <- census_data$`v_CA21_4890: Arab` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$latinamerican_pct <- census_data$`v_CA21_4893: Latin American` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$southeastasian_pct <- census_data$`v_CA21_4896: Southeast Asian` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$westasian_pct <- census_data$`v_CA21_4899: West Asian` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$korean_pct <- census_data$`v_CA21_4902: Korean` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$japanese_pct <- census_data$`v_CA21_4905: Japanese` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$eastasian_pct <- census_data$japanese_pct + census_data$korean_pct + census_data$chinese_pct
+census_data$eastsoutheastasian_pct <- census_data$japanese_pct + census_data$korean_pct + census_data$chinese_pct +census_data$filipino_pct + census_data$southeastasian_pct
+census_data$visminority_pct <- census_data$`v_CA21_4908: Visible minority, n.i.e.` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$multivisminority_pct <- census_data$`v_CA21_4911: Multiple visible minorities` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$notvisminority_pct <- census_data$`v_CA21_4914: Not a visible minority` / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$indig_pct <- census_data$indig_pop / census_data$indig_respondents
+census_data$minority_pct <- census_data$minority_pop / census_data$`v_CA21_4872: Total - Visible minority for the population in private households`
+census_data$own_pct <- census_data$owners / census_data$`v_CA21_4237: Total - Private households by tenure`
+census_data$rent_pct <- census_data$renters / census_data$`v_CA21_4237: Total - Private households by tenure`
+census_data$male_pct <- census_data$male / census_data$`v_CA21_8: Total - Age`
+census_data$female_pct <- census_data$female / census_data$`v_CA21_8: Total - Age`
+census_data$english_pct <- census_data$English / census_data$`v_CA21_4917: Total - Ethnic or cultural origin for the population in private households`
+census_data$chinese_origin_pct <- census_data$Chinese / census_data$`v_CA21_4917: Total - Ethnic or cultural origin for the population in private households`
+census_data$LCS_American_origin_pct <- census_data$LCS_American/ census_data$`v_CA21_4917: Total - Ethnic or cultural origin for the population in private households`
+census_data$African_origin_pct <- census_data$African / census_data$`v_CA21_4917: Total - Ethnic or cultural origin for the population in private households`
+census_data$MidEast_WC_Asian_origin_pct <- census_data$MidEast_WC_Asian / census_data$`v_CA21_4917: Total - Ethnic or cultural origin for the population in private households`
+census_data$E_SE_Asian_origin_pct <- census_data$E_SE_Asian / census_data$`v_CA21_4917: Total - Ethnic or cultural origin for the population in private households`
+census_data$European_origin_pct <- census_data$European / census_data$`v_CA21_4917: Total - Ethnic or cultural origin for the population in private households`
+census_data$S_Asian_origin_pct <- census_data$S_Asian / census_data$`v_CA21_4917: Total - Ethnic or cultural origin for the population in private households`
+census_data$Caucasian_origin_pct <- census_data$Caucasian / census_data$`v_CA21_4917: Total - Ethnic or cultural origin for the population in private households`
+census_data$citizen_pct <- census_data$citizens/ census_data$`v_CA21_4389: Total - Citizenship for the population in private households`
+census_data$noncitizen_pct <- census_data$non_citizens / census_data$`v_CA21_4389: Total - Citizenship for the population in private households`
+census_data$nonimmigrant_pct <- census_data$non_immigrants/ census_data$`v_CA21_4404: Total - Immigrant status and period of immigration for the population in private households`
+census_data$immigrant_pct <- census_data$immigrants / census_data$`v_CA21_4404: Total - Immigrant status and period of immigration for the population in private households`
+census_data$separated_divorced_widowed_pct <- (census_data$`v_CA21_483: Separated` + census_data$`v_CA21_489: Widowed`+census_data$`v_CA21_486: Divorced`)/census_data$`v_CA21_453: Marital status for the total population aged 15 years and over`
+census_data$employed_pct <- census_data$`v_CA21_6498: Employed`/census_data$`v_CA21_6495: In the labour force`
+census_data$no_diploma_pct <- census_data$`v_CA21_5802: No high school diploma or equivalency certificate`/census_data$`v_CA21_5799: Total - Secondary (high) school diploma or equivalency certificate for the population aged 15 years and over in private households`
+census_data$live_alone_pct <- census_data$`v_CA21_534: Living alone`/census_data$`v_CA21_510: Persons in private households`
 census_data <- census_data[, -c(2, 4,6,7,9, 11:13)]  # Drops columns 2, 5, and 7
 
-MSDI <- read_excel(here("data","raw", "INDQ_MSDI_Canada", "A-MSDIData_Can2021_en", "1. EquivalenceTableCanada2021_en.xlsx"))
+MSDI <- read_excel(here("data","raw", "INDQ_MSDI_Canada", "A-MSDIData_Can2021_en", "1. EquivalenceTableCanada2021_en.xlsx")) ### read about the indices here: https://www.inspq.qc.ca/sites/default/files/2024-04/3476-material-social-deprivation-index-guide-2021.pdf
 
 # Filter the dataframe
 MSDI_yvr <- MSDI %>% 
@@ -771,7 +870,7 @@ dat_grid_final <- with_progress({
   
 })
 
-dat_grid_final <- dat_grid_final[,-c(82:85)]
+dat_grid_final <- dat_grid_final[,-c(139:143)]
 
 #### gen nearest food retailer column
 dat_grid_final <- dat_grid_final %>%
@@ -793,7 +892,7 @@ save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_750.Rdata"))
 
 
 } else {
-  ## object called "dat_grid"
+  ## object called "dat_grid_final"
   load(file = here("data", "dat_fw_demo_lc_retail_750.Rdata"))
 }
 
@@ -828,6 +927,90 @@ save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_750.Rdat
 }
 
 
+if (gen_roads) {
+  ### Set parameters
+  roads <- st_read(here("data","raw","british-columbia-latest-free.shp","gis_osm_roads_free_1.shp")) #### download here: https://download.geofabrik.de/north-america/canada/british-columbia.html
+  roads <- st_transform(roads, st_crs(dat_grid_final)) ### metadata here: https://download.geofabrik.de/osm-data-in-gis-formats-free.pdf
+  roads_cropped <- st_intersection(roads, dat_grid_final)
+  #plot(roads_cropped$geometry)
+  #roads_service <- roads_cropped[roads_cropped$fclass == c("service","unclassified", "cycleway") ]
+  roads_service <- roads_cropped[roads_cropped$fclass %in% c("service", "unclassified", "cycleway"), ]
+  
+  # Assign weights based on road type
+  roads_service$road_weight <- dplyr::case_when(
+    roads_service$fclass %in% c("service", "unclassified") ~ 1,
+    roads_service$fclass == "cycleway" ~ 0.25
+  )
+  
+  
+  
+  #test <- roads_cropped[roads_cropped$fclass == "cycleway", ]
+  plot(roads_service$geometry)
+  #plot(test$geometry)
+  
+  roads_in_grid <- st_intersection(roads_service, dat_grid_final)
+  # Then calculate lengths in meters
+  roads_in_grid$length_m <- st_length(roads_in_grid)
+  lengths_by_grid <- roads_in_grid %>%
+    st_drop_geometry() %>%
+    group_by(grid_id) %>%
+    summarise(service_road_length_m = sum(as.numeric(length_m)))
+  
+  dat_grid_final <- dat_grid_final %>%
+    left_join(lengths_by_grid, by = "grid_id")
+  
+  # If no roads intersected a grid cell, it will have NA — replace with 0:
+  dat_grid_final$service_road_length_m[is.na(dat_grid_final$service_road_length_m)] <- 0
+  
+  
+  # Get centroids of each grid cell to measure from center
+  grid_centroids <- st_centroid(dat_grid_final)
+  
+  # Compute distance from centroids to all service roads
+  dist_to_road <- st_distance(grid_centroids, roads_service)
+  
+  # Find index of the nearest road for each centroid
+  min_dist_index <- apply(dist_to_road, 1, which.min)
+  
+  # Get the minimum distance values
+  min_dist_m <- apply(dist_to_road, 1, min)
+  
+  # Store minimum distances in your data
+  dat_grid_final$dist_to_service_road_m <- as.numeric(min_dist_m)
+  
+  # Identify the road type (fclass) of the nearest road for each centroid
+  nearest_fclass <- roads_service$fclass[min_dist_index]
+  
+  # Compute distance-based weight
+  dist_weight <- case_when(
+    dat_grid_final$dist_to_service_road_m <= 3 ~ 1,
+    dat_grid_final$dist_to_service_road_m <= 20 ~ {
+      d <- (dat_grid_final$dist_to_service_road_m - 3) / (20 - 3)
+      (1 - d^2)
+    },
+    TRUE ~ 0
+  )
+  
+  # Modify by fclass: cycleway = 0.25 multiplier
+  road_type_multiplier <- ifelse(nearest_fclass == "cycleway", 0.33, 1)
+  
+  # Final weighted score
+  dat_grid_final$service_road_weight <- dist_weight * road_type_multiplier
+  
+  dat_grid_final$service_road_bool <- case_when(
+    dat_grid_final$dist_to_service_road_m <= 25 ~ 1,
+    TRUE ~ 0
+  )
+  
+  save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_roads_750.Rdata"))
+  
+} else {
+  ## object called "dat_grid_final"
+  load(file = here("data", "dat_fw_demo_lc_retail_shelters_roads_750.Rdata"))
+}
+  
+  
+
 
 #########################################################################################################
 ############## Module 6: read in nearest homeless shelter #################
@@ -840,10 +1023,23 @@ dat_grid_final$BuiltSum <- dat_grid_final$Paved+dat_grid_final$Buildings+dat_gri
 dat_grid_final$GrassSoilSum <- dat_grid_final$ModGrassHerb + dat_grid_final$Soil
 dat_grid_final$housing_lowdensity <- dat_grid_final$single_detached + dat_grid_final$semi_detached + dat_grid_final$row_houses ### rowhouses may need to be removed, because vancouver doesn't uniformly service ALL of these
 dat_grid_final$housing_highdensity <- dat_grid_final$apt_flat + dat_grid_final$low_rise + dat_grid_final$high_rise
-dat_grid_final$pct_housing_notsuitable <- dat_grid_final$pct_housing_notsuitable/100
-dat_grid_final$pct_rent_thirty <- dat_grid_final$pct_rent_thirty/100
-dat_grid_final$pct_rent_subsidized <- dat_grid_final$pct_rent_subsidized/100
-dat_grid_final$poorservice_housing <- dat_grid_final$rent_pct + dat_grid_final$pct_housing_notsuitable + dat_grid_final$pct_rent_thirty
+dat_grid_final$housing_suitability <- dat_grid_final$`v_CA21_4261: Suitable`/dat_grid_final$`v_CA21_4260: Total - Private households by housing suitability`
+dat_grid_final$pct_unsuitable_housing <- 1 - dat_grid_final$housing_suitability
+dat_grid_final$pct_unsuitable_housing[dat_grid_final$pct_unsuitable_housing == 1] <- 0 ### replaces Pacific Spirit and Ocean near 2nd beach with 0s (i.e., no housing at all)
+dat_grid_final$pct_rent_thirty <- dat_grid_final$`v_CA21_4315: % of tenant households spending 30% or more of its income on shelter costs (55)`/100
+dat_grid_final$pct_rent_subsidized <- dat_grid_final$`v_CA21_4314: % of tenant households in subsidized housing (61)`/100
+#dat_grid_final$poorservice_housing <- dat_grid_final$rent_pct + dat_grid_final$pct_housing_notsuitable + dat_grid_final$pct_rent_thirty
+dat_grid_final$rent_subsidized_interaction <- dat_grid_final$pct_rent_subsidized*dat_grid_final$rent_pct
+dat_grid_final$pct_minor_repairs <- dat_grid_final$`v_CA21_4273: Only regular maintenance and minor repairs needed`/dat_grid_final$`v_CA21_4272: Total - Occupied private dwellings by dwelling condition`
+dat_grid_final$pct_major_repairs <- dat_grid_final$`v_CA21_4274: Major repairs needed`/dat_grid_final$`v_CA21_4272: Total - Occupied private dwellings by dwelling condition`
+dat_grid_final$total_repairs <- (dat_grid_final$`v_CA21_4273: Only regular maintenance and minor repairs needed` + dat_grid_final$`v_CA21_4274: Major repairs needed`)/dat_grid_final$`v_CA21_4272: Total - Occupied private dwellings by dwelling condition`
+dat_grid_final$one_parent_pct <- dat_grid_final$`v_CA21_507: Total one-parent families`/dat_grid_final$`v_CA21_499: Total number of census families in private households`
+dat_grid_final$avg_household_size <- dat_grid_final$`v_CA21_452: Average household size`
+# logit <- function(p) {
+#   log(p / (1 - p))
+# }
+
+#dat_grid_final$service_road_weight_logit <- logit(dat_grid_final$service_road_weight)
 
 dat_grid_final <- dat_grid_final %>%
   mutate(across(where(is.numeric), ~replace_na(., 0)))
@@ -853,12 +1049,12 @@ dat_grid_final <- dat_grid_final %>%
 
 
 
-save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_mods_750.Rdata"))
+save(dat_grid_final, file = here("data","dat_fw_demo_lc_retail_shelters_roads_mods_750.Rdata"))
 
 
 } else {
   ## object called "dat_grid_final"
-  load(file = here("data", "dat_fw_demo_lc_retail_shelters_mods_750.Rdata"))
+  load(file = here("data", "dat_fw_demo_lc_retail_shelters_roads_mods_750.Rdata"))
 }
 
 
@@ -872,12 +1068,11 @@ data_only <- st_drop_geometry(dat_clean)
 cols_to_scale <- setdiff(names(data_only), c("site", "grid_id"))  # adjust as needed
 data_only <- as.data.frame(st_drop_geometry(dat_clean))
 # Scale those columns safely
-data_only[cols_to_scale] <- lapply(data_only[cols_to_scale], scale)
+data_only[cols_to_scale] <- lapply(data_only[cols_to_scale], function(x) as.numeric(scale(x)))
 # Recombine scaled data with geometry
 dat_scaled <- st_sf(data_only, geometry = st_geometry(dat_clean))
 dat_scaled$site_id <- as.integer(factor(dat_scaled$site))
 save(dat_scaled, file = here("data", "dat_scaled_750.Rdata"))
-
 
 
 } else {

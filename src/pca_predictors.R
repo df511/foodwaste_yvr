@@ -15,7 +15,6 @@ my_data <- as.data.frame(my_data)
 my_data <- my_data[, colSums(is.na(my_data)) == 0]  # Remove NA columns
 
 
-
 # Perform PCA
 pca_result <- prcomp(my_data[,-c(1,84,87)]) ### remove first and last columns
 
@@ -140,6 +139,204 @@ pdf(pdf_file)
 
 # Close the PDF graphics device
 dev.off()
+
+
+
+######################################
+###### subset housing and population only
+
+
+
+## predictor PCA
+
+
+
+# Define your variable list
+selected_vars <- c(
+  "rent_pct", "single_detached", "nearest_shelter_dist", "indig_pct", 
+  "female_pct", "SCOREMAT", "SCORESOC", "pop_km",
+  "household_income", "housing_highdensity", "housing_lowdensity",
+  "thirtyonshelter_majorrepairs", "notsuitable_majorrepairs", "pct_rent_subsidized", 
+  "pct_housing_notsuitable", "pct_rent_thiry", 
+  "housing_low_density", "housing_high_density", "poorservice_housing"
+)
+# Ensure the selected variables exist in the dataset
+selected_vars <- selected_vars[selected_vars %in% colnames(my_data)]
+
+# Subset data to only include selected variables
+my_data_subset <- my_data[, selected_vars]
+
+
+
+# Perform PCA
+pca_result <- prcomp(my_data_subset) ### remove first and last columns
+
+# Summarize the PCA result
+summary(pca_result)
+
+
+# Extract proportion of variance explained
+variance_explained <- summary(pca_result)$importance[2, ]
+
+# Cumulative variance explained
+cumulative_variance_explained <- cumsum(variance_explained)
+
+# Create a data frame for plotting
+variance_df <- data.frame(
+  PC = 1:length(variance_explained),
+  Variance_Explained = variance_explained,
+  Cumulative_Variance_Explained = cumulative_variance_explained
+)
+
+# Plot scree plot and cumulative variance explained
+scree_plot <- ggplot(variance_df, aes(x = PC, y = Variance_Explained)) +
+  geom_bar(stat = "identity") +
+  geom_line(aes(y = Cumulative_Variance_Explained), color = "red", size = 1) +
+  geom_point(aes(y = Cumulative_Variance_Explained), color = "red", size = 2) +
+  labs(title = "Scree Plot", x = "Principal Component", y = "Variance Explained") +
+  theme_minimal()
+
+cumulative_variance_plot <- ggplot(variance_df, aes(x = PC, y = Cumulative_Variance_Explained)) +
+  geom_line(color = "blue", size = 1) +
+  geom_point(color = "blue", size = 2) +
+  labs(title = "Cumulative Variance Explained", x = "Principal Component", y = "Cumulative Variance Explained") +
+  theme_minimal()
+
+# Arrange plots
+grid.arrange(scree_plot, cumulative_variance_plot, ncol = 2)
+
+# Print the cumulative variance explained
+print(cumulative_variance_explained)
+
+
+print(scree_plot)
+
+
+# Extract loadings
+loadings <- pca_result$rotation
+
+# Print the loadings
+print(loadings)
+
+# Convert loadings to a data frame for easier plotting
+loadings_df <- as.data.frame(loadings)
+
+# Add a column for variable names
+loadings_df$Variable <- rownames(loadings_df)
+
+# Melt the data frame for ggplot
+loadings_melted <- reshape2::melt(loadings_df, id.vars = "Variable")
+
+# Plot the loadings
+ggplot(loadings_melted, aes(x = Variable, y = value, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Loadings of Variables on Principal Components", x = "Variables", y = "Loadings") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+# Plot the loadings
+pcavector_plot <- ggplot(loadings_melted[1:24,], aes(x = Variable, y = value, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Loadings of Variables on Principal Components", x = "Variables", y = "Loadings") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+# Specify the file path where you want to save the PDF
+#pdf_file <- here("figures", "pca123_vectors.pdf")
+
+# Open a PDF graphics device
+#pdf(pdf_file)
+
+# Print the combined plot
+print(pcavector_plot)
+# 
+# # Close the PDF graphics device
+# dev.off()
+
+
+# Create a data frame for the loadings
+loadings_df <- data.frame(
+  Variable = rownames(loadings),
+  PC1 = loadings[, 1],
+  PC2 = loadings[, 2]
+)
+
+# # Extract scores (principal components) for the first two PCs
+# scores <- pca_result$x[, 1:2]
+# scores_df <- data.frame(scores)
+
+# Plot the loadings as vectors
+pca1 <- ggplot() +
+  #geom_point(data = scores_df, aes(x = PC1, y = PC2), alpha = 0.5) +  # Plot scores
+  geom_segment(data = loadings_df, aes(x = 0, y = 0, xend = PC1, yend = PC2), 
+               arrow = arrow(length = unit(0.2, "cm")), color = "red") +  # Plot loadings
+  geom_text_repel(data = loadings_df, aes(x = PC1, y = PC2, label = Variable), 
+                  size = 4, color = "black") +  # Label the vectors
+  labs(title = "PCA Biplot",
+       x = "PC1",
+       y = "PC2") +
+  theme_minimal()
+
+
+# Specify the file path where you want to save the PDF
+pdf_file <- here("figs", "pca_12_housing.pdf")
+
+# Open a PDF graphics device
+pdf(pdf_file)
+
+# Print the combined plot
+print(pca1)
+
+# Close the PDF graphics device
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Create a data frame for the loadings

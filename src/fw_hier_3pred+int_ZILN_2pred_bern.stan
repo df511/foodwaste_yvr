@@ -24,6 +24,7 @@ parameters {
   real beta1;                    // Coefficient for X1
   real beta2;                    // Coefficient for X2
   real beta3;                    // Coefficient for X3
+  real beta_int;                 // Interaction coefficient for X1 * X3
   real<lower=0> sigma;           // Std dev for lognormal model
 
   real gamma;                    // Intercept for zero-inflation
@@ -38,7 +39,7 @@ transformed parameters {
   vector<lower=0,upper=1>[N] pi;
 
   for (n in 1:N) {
-    log_mean[n] = mu[site_id[n]] + beta1 * X1[n] + beta2 * X2[n] + beta3 * X3[n];
+    log_mean[n] = mu[site_id[n]] + beta1 * X1[n] + beta2 * X2[n] + beta3 * X3[n] + beta_int * (X1[n] * X3[n]);
     pi[n] = inv_logit(gamma + delta1 * P1[n] + delta2 * P2[n]);
   }
 }
@@ -54,6 +55,7 @@ model {
   beta1 ~ normal(0, 1);
   beta2 ~ normal(0, 1);
   beta3 ~ normal(0, 1);
+  beta_int ~ normal(0, 1);
   sigma ~ normal(0, 1);
 
   gamma ~ normal(1, 1);

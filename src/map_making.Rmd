@@ -8,7 +8,6 @@ date: '2025-04-11'
 library(sf)
 ```
 
-
 ```{r}
 
 
@@ -16,8 +15,8 @@ library(sf)
 # Define output file name and resolution
 pdf(here("figs","food_waste_score_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
 
-ggplot(dat_grid) +
-  geom_sf(aes(fill = log(fw_score)), color = NA) +  # No borders for a smooth heatmap
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = log(fw_score_weighted)), color = NA) +  # No borders for a smooth heatmap
   scale_fill_viridis_c(option = "inferno", name = "Weighted Value") +  # "inferno" for bright-darker range
   theme_minimal() +
   theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
@@ -385,7 +384,7 @@ dev.off()
 # Define output file name and resolution
 pdf(here("figs","NaturalVegSum2_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
 
-ggplot(dat_grid_final) +
+ggplot(dat_scaled) +
   geom_sf(aes(fill = NaturalVegSum2), color = NA) +  # No borders for a smooth heatmap
   scale_fill_viridis_c(option = "inferno", name = "NaturalVegSum2") +  # "inferno" for bright-darker range
   theme_minimal() +
@@ -494,7 +493,7 @@ dev.off()
 
 
 # Define output file name and resolution
-pdf(here("figs","NaturalVegSum_750m_from_dat_scaled.pdf"), width = 80, height = 64)  # Adjust size as needed
+pdf(here("figs","NaturalVegSum_750m_from_dat_scaled2.pdf"), width = 80, height = 64)  # Adjust size as needed
 
 ggplot(dat_scaled) +
   geom_sf(aes(fill = NaturalVegSum), color = NA) +  # No borders for a smooth heatmap
@@ -522,4 +521,394 @@ dev.off()
 
 
 
+# Define output file name and resolution
+pdf(here("figs","rent_pct_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = rent_pct), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "percent renters") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","pop_km_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = pop_km), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Pop. per sq. km.") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","population_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = population), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Population") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","population2_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = Population), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Population") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","fw_score_weighted_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = fw_score_weighted), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "fw_score_weighted") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","total_repairs_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = total_repairs), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Total Repairs") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","major_repairs_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = major_repairs), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Major Repairs") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","minor_repairs_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = minor_repaires), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "Minor Repairs") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","pct_housing_notsuitable_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = pct_housing_notsuitable), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "pct_housing_notsuitable") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","pct_rent_subsidized_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = pct_rent_subsidized), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "pct_rent_subsidized") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+# Define output file name and resolution
+pdf(here("figs","rent_subsidized_int_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = dat_scaled$rent_subsidized_int), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "rent_subsidized_int") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","service_road_length_750m.pdf"), width = 20, height = 15)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = dat_grid_final$service_road_length_m), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "service_road_length_m") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","log_service_road_dist_750m.pdf"), width = 20, height = 15)  # Adjust size as needed
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = log(dat_grid_final$dist_to_service_road_m)), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "dist_to_service_road_m") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+# Define output file name and resolution
+pdf(here("figs","log_service_road_dist_750m.pdf"), width = 20, height = 15)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = log(dat_scaled$dist_to_service_road_m)), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "dist_to_service_road_m") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+
+# Define output file name and resolution
+pdf(here("figs","service_road_weight.pdf"), width = 20, height = 15)  # Adjust size as needed
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = service_road_weight), color = NA) +  # No borders for a smooth heatmap
+  scale_fill_viridis_c(option = "inferno", name = "service_road_weigh") +  # "inferno" for bright-darker range
+  theme_minimal() +
+  theme(panel.grid = element_blank())  # Remove grid lines for a cleaner look
+
+# Close the PDF device to save the file
+dev.off()
+
+
+
+library(dplyr)
+library(sf)
+
+# Group by site and create a centroid per group
+site_labels <- dat_grid_final %>%
+  group_by(site) %>%
+  summarise(geometry = st_union(geometry)) %>%       # Combine all grid cells per site
+  mutate(label_point = st_centroid(geometry))        # Get a label point per site
+
+
+
+# Save plot to PDF
+pdf(here("figs","service_road_length_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = service_road_length_m), color = NA) +  # Fill grid by road length
+  geom_sf(data = site_labels, aes(geometry = label_point), inherit.aes = FALSE) +  # Ensure geom_sf works with label geometry
+  geom_sf_text(data = site_labels, aes(geometry = label_point, label = site), size = 6, fontface = "bold") +
+  scale_fill_viridis_c(option = "inferno", name = "service_road_length_m") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+
+# Save plot to PDF
+pdf(here("figs","service_road_bool_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = service_road_bool), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "service_road_bool") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+
+
+
+# Save plot to PDF
+pdf(here("figs","service_road_weight_750m_3.pdf"), width = 20, height = 15)
+
+ggplot(dat_scaled) +
+  geom_sf(aes(fill = service_road_weight), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "service_road_weight") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+
+
+# Save plot to PDF
+pdf(here("figs","pct_major_repairs_750m_3.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = pct_major_repairs), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "pct_major_repairst") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+# Save plot to PDF
+pdf(here("figs","pct_minor_repairs_750m_3.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = pct_minor_repairs), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "pct_minor_repairs") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+# Save plot to PDF
+pdf(here("figs","total_repairs_750m_3.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = total_repairs), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "total_repairs") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+# Save plot to PDF
+pdf(here("figs","pct_rent_subsidized_750m_3.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = pct_rent_subsidized), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "pct_rent_subsidized") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+# Save plot to PDF
+pdf(here("figs","housing_suitability_750m_3.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = housing_suitability), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "housing_suitability") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+# Save plot to PDF
+pdf(here("figs","pct_unsuitable_housing_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = pct_unsuitable_housing), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "pct_unsuitable_housing") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+
+# Save plot to PDF
+pdf(here("figs","separated_divorced_widowed_pct_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = separated_divorced_widowed_pct), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "separated_divorced_widowed_pct") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+# Save plot to PDF
+pdf(here("figs","live_alone_pct_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = live_alone_pct), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "live_alone_pct") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+
+# Save plot to PDF
+pdf(here("figs","live_alone_pct_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = live_alone_pct), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "live_alone_pct") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+# Save plot to PDF
+pdf(here("figs","one_parent_pct_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = one_parent_pct), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "one_parent_pct") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
 ```

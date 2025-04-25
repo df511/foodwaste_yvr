@@ -76,3 +76,8 @@ plot(prop_cropped)a
 
 
 waste_facilities <- fromJSON(here("data","raw" ,"permanent_waste_facilities.geojson"))
+
+
+
+
+roads <- st_read(here("data","raw","british-columbia-latest-free.shp","gis_osm_roads_free_1.shp"))

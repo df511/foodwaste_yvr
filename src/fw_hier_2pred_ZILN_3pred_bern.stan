@@ -11,6 +11,7 @@ data {
   vector[N] X2;                       // Predictor 2
   vector[N] P1;                       // Predictor1 for zero-inflation
   vector[N] P2;                       // Predictor2 for zero-inflation
+  vector[N] P3;                       // Predictor2 for zero-inflation
   real<lower=0> fw_score_weighted[N]; // Food waste scores (including zeros)
 }
 
@@ -27,6 +28,7 @@ parameters {
   real gamma;                    // Intercept for zero-inflation
   real delta1;                   // Coefficient for P1
   real delta2;                   // Coefficient for P1
+  real delta3;                   // Coefficient for P1
 }
 
 // Transformed parameters block
@@ -37,7 +39,7 @@ transformed parameters {
 
   for (n in 1:N) {
     log_mean[n] = mu[site_id[n]] + beta1 * X1[n] + beta2 * X2[n];
-    pi[n] = inv_logit(gamma + delta1 * P1[n] + delta2 * P2[n]);
+    pi[n] = inv_logit(gamma + delta1 * P1[n] + delta2 * P2[n]) + delta2 * P2[n];
   }
 }
 
@@ -49,13 +51,14 @@ model {
   mu_raw ~ normal(0, 1);
 
   // Priors
-  beta1 ~ normal(0, 0.5);
-  beta2 ~ normal(0, 0.5);
-  sigma ~ normal(0, 0.5);
+  beta1 ~ normal(0, 1);
+  beta2 ~ normal(0, 1);
+  sigma ~ normal(0, 1);
 
   gamma ~ normal(1, 1);
-  delta1 ~ normal(0, 0.5);
-  delta2 ~ normal(0, 0.5);
+  delta1 ~ normal(0, 1);
+  delta2 ~ normal(0, 1);
+  delta2 ~ normal(0, 1);
 
   // Likelihood
   for (n in 1:N) {
