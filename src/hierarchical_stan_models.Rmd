@@ -277,19 +277,19 @@ ggplot(site_means, aes(x = site, y = mean_y)) +
 ```{r}
 # Prepare data for Stan model (no hierarchy)
 stan_data <- list(
-  N = nrow(dat_scaled),
-  J = 13,
-  site_id = dat_scaled$site_id,
-  X1 = dat_scaled$rent_pct,
-  X2 = dat_scaled$nearest_food_retail,
-  X3 = dat_scaled$,
-  P1 = dat_scaled,
-  fw_score_weighted = dat_clean$fw_score_weighted
+  N = nrow(dat_combined),
+  J = 12,
+  site_id = dat_combined$site_id,
+  X1 = dat_combined$Factor1,
+  X2 = dat_combined$Factor2,
+  X3 = dat_combined$Factor3,
+  P1 = dat_combined$service_road_weight,
+  fw_score_weighted = dat_no_ub$fw_score_weighted
 )
 ```
 
 ```{r}
-fit_hier_A_rent_retail_noncitizen_B_natveg <- stan(
+fit_hier_A_FA1_FA2_FA3_B_roadweight_noub <- stan(
   file = here("src","fw_hier_3pred_ZILN_1pred_bern.stan"),  # Path to the Stan model
   data = stan_data, 
   chains = 4, 
@@ -302,11 +302,29 @@ save(fit_hier_A_rent_retail_noncitizen_B_natveg, file = here("data","fit_hier_A_
 ```
 
 ```{r}
+# Extract samples
+posterior_samples <- rstan::extract(fit_hier_A_FA1_FA2_FA3_B_roadweight_noub)
+
 # Extract posterior samples
-y_rep <- extract(fit_hier_A_rent_retail_noncitizen_B_natveg)$fw_score_pred  # Change "y_rep" based on how you named your predicted values
-pi_pred <- extract(fit_hier_A_rent_retail_noncitizen_B_natveg)$pi_pred  # Change "y_rep" based on how you named your predicted values
-y_obs <- dat_clean$fw_score_weighted  # Replace with actual observed data
-pi_obs <- ifelse(dat_grid_final$fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- posterior_samples$pi_pred # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_combined$fw_score_weighted  # Replace with actual observed data
+pi_obs <- ifelse(dat_combined$fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+
+
+
+# Explore distributions
+hist(posterior_samples$mu0, breaks = 40, main = "mu0", col = "skyblue")
+hist(posterior_samples$tau_mu, breaks = 40, main = "tau_mu", col = "salmon")
+hist(posterior_samples$mu, breaks = 40, main = "mu = mu0 + tau_mu * mu_raw", col = "lightgreen")
+hist(posterior_samples$sigma, breaks = 40, main = "sigma", col = "lightblue")
+hist(posterior_samples$beta1, breaks = 40, main = "beta1", col = "pink")
+hist(posterior_samples$beta2, breaks = 40, main = "beta2", col = "purple")
+hist(posterior_samples$beta3, breaks = 40, main = "beta3", col = "magenta")
+#hist(posterior_samples$beta_int, breaks = 40, main = "beta_int", col = "purple4")
+hist(posterior_samples$gamma, breaks = 40, main = "gamma", col = "yellow")
+hist(posterior_samples$delta1, breaks = 40, main = "delta1", col = "orange")
+#hist(posterior_samples$delta2, breaks = 40, main = "delta2", col = "brown")
 
 
 
@@ -332,7 +350,7 @@ mean_pi_obs <- mean(pi_obs, na.rm = TRUE)
 # Create the plot
 ggplot(pi_pred_long, aes(x = pi_pred)) +
   geom_histogram(binwidth = 0.005, fill = "lightblue", color = "black", alpha = 0.7) +
-  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", size = 1) +  # Add red vertical line
+  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", linewidth = 1) +  # Add red vertical line
   labs(title = "Posterior Predictive Check for pi",
        x = "Predicted pi",
        y = "Frequency") +
@@ -1139,16 +1157,16 @@ launch_shinystan(fit_hier_A_rent_retail_B_natveg_retail)
 stan_data <- list(
   N = nrow(dat_no_ub_scaled),
   J = 12,
-  site_id = dat_no_ub_scaled$site_id,
-  X1 = dat_no_ub_scaled$rent_pct,
-  X2 = dat_no_ub_scaled$nearest_food_retail,
-  P1 = dat_no_ub_scaled$service_road_weight,
+  site_id = dat_combined$site_id,
+  X1 = dat_combined$Factor1,
+  X2 = dat_combined$Factor2,
+  P1 = dat_combined$service_road_weight,
   fw_score_weighted = dat_no_ub$fw_score_weighted
 )
 ```
 
 ```{r}
-fit_hier_A_rent_food_B_roadweight_noub <- stan(
+fit_hier_A_FA1_FA2_B_roadweight_noub <- stan(
   file = here("src","fw_hier_2pred_ZILN_1pred_bern.stan"),  # Path to the Stan model
   data = stan_data, 
   chains = 4, 
@@ -1157,11 +1175,11 @@ fit_hier_A_rent_food_B_roadweight_noub <- stan(
 ```
 
 ```{r}
-save(fit_hier_A_rent_food_B_roadweight_noub, file = here("data","fit_hier_A_rent_food_B_roadweight_noub.Rdata"))
+save(fit_hier_A_FA1_FA3_B_roadweight_noub, file = here("data","fit_hier_A_FA1_FA3_B_roadweight_noub_corefactors.Rdata"))
 ```
 ```{r}
 # Extract samples
-posterior_samples <- rstan::extract(fit_hier_A_rent_food_B_roadweight_noub)
+posterior_samples <- rstan::extract(fit_hier_A_FA1_FA3_B_roadweight_noub)
 
 # Extract posterior samples
 y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
@@ -1182,13 +1200,15 @@ hist(posterior_samples$gamma, breaks = 40, main = "gamma", col = "yellow")
 hist(posterior_samples$delta1, breaks = 40, main = "delta1", col = "orange")
 
 
+set.seed(123)  # for reproducibility
+sample_rows <- sample(1:nrow(y_rep), 50)  # randomly pick 50 rows
 
 
-ppc_dens_overlay(y_obs, y_rep[2000:2050,])  # Plot overlay of observed vs simulated densities
+ppc_dens_overlay(y_obs, y_rep[sample_rows,])  # Plot overlay of observed vs simulated densities
 
 
 # Plot overlay of observed vs simulated densities with x-axis range 0 to 4
-ppc_dens_overlay(y_obs, y_rep[2000:2050, ]) +
+ppc_dens_overlay(y_obs, y_rep[sample_rows, ]) +
   xlim(0.001,1) +
   labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
        x = "Food Waste Score",

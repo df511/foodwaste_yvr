@@ -6,9 +6,9 @@ library(ggrepel)
 library(gridExtra)
 
 # Load your data (replace "path_to_your_data.csv" with the actual path to your CSV file)
-load(file = here("data", "dat_scaled_750.Rdata"))
+load(file = here("data", "dat_no_ub_scaled_750.Rdata"))
 
-my_data <- dat_scaled %>% select(where(is.numeric))
+my_data <- dat_no_ub_scaled %>% select(where(is.numeric))
 my_data <- as.data.frame(my_data)
 my_data <- my_data[, colSums(is.na(my_data)) == 0]  # Remove NA columns
 
@@ -21,16 +21,16 @@ my_data <- my_data[, colSums(is.na(my_data)) == 0]  # Remove NA columns
 #   "pct_rent_thirty", "pct_housing_notsuitable", "pct_rent_subsidized", 
 #   "major_repairs", "minor_repairs", "total_occupied_housing"
 # )
+# 
+# # Define the variables to keep in the heatmap
+# selected_vars <- c("rent_pct","nearest_shelter_dist","indig_pct", "nearest_food_retail",
+#                    "female_pct", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct", "one_parent_pct", "avg_household_size","housing_highdensity", "housing_lowdensity",
+#                    "pct_major_repairs", "pct_rent_thirty", "pct_rent_subsidized", "pct_unsuitable_housing",
+#                    "latinamerican_pct","chinese_pct", "korean_pct", "japanese_pct", "southeastasian_pct", "southasian_pct", "arab_pct", "notvisminority_pct", "black_pct","filipino_pct")  # Replace with actual column names
+# 
 
 # Define the variables to keep in the heatmap
-selected_vars <- c("rent_pct","nearest_shelter_dist","indig_pct", 
-                   "female_pct", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct", "one_parent_pct", "avg_household_size","housing_highdensity", "housing_lowdensity",
-                   "pct_major_repairs", "pct_rent_thirty", "pct_rent_subsidized", "pct_unsuitable_housing", 
-                   "latinamerican_pct","chinese_pct", "korean_pct", "japanese_pct", "southeastasian_pct", "southasian_pct", "arab_pct", "notvisminority_pct", "black_pct","filipino_pct")  # Replace with actual column names
-
-
-# Define the variables to keep in the heatmap
-selected_vars <- c("rent_pct","nearest_shelter_dist", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct",
+selected_vars <- c("rent_pct","nearest_shelter_dist","nearest_food_retail", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct",
                    "female_pct","one_parent_pct", "avg_household_size","housing_highdensity", "housing_lowdensity",
                    "pct_major_repairs", "pct_rent_thirty", "pct_rent_subsidized", "pct_unsuitable_housing")
 
@@ -57,7 +57,7 @@ abline(h = 1, col = "red", lty = 2)  # Kaiser criterion line
 
 
 # Set number of factors to extract
-num_factors <- 10
+num_factors <- 3
 
 # Perform factor analysis
 fa_result <- factanal(my_data_subset, factors = num_factors, rotation = "varimax", scores = "regression")
@@ -115,8 +115,8 @@ scale_factor <- 1.5
 loadings_df$Factor1 <- loadings_df[,1] * scale_factor
 loadings_df$Factor2 <- loadings_df[,2] * scale_factor
 loadings_df$Factor3 <- loadings_df[,3] * scale_factor
-loadings_df$Factor4 <- loadings_df[,4] * scale_factor
-loadings_df$Factor5 <- loadings_df[,5] * scale_factor
+# loadings_df$Factor4 <- loadings_df[,4] * scale_factor
+# loadings_df$Factor5 <- loadings_df[,5] * scale_factor
 
 # Plot
 ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor2)) +
@@ -141,32 +141,32 @@ ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor3)) +
   theme_minimal()
 
 
+# 
+# # Plot
+# ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor4)) +
+#   geom_segment(arrow = arrow(length = unit(0.2, "cm")), color = "red") +
+#   geom_text_repel(aes(x = Factor1, y = Factor4, label = Variable), size = 4) +
+#   coord_equal() +
+#   xlim(-1.5, 1.5) + ylim(-1.5, 1.5) +
+#   labs(title = "Factor Analysis Loadings Biplot",
+#        x = "Factor 1", y = "Factor 4") +
+#   theme_minimal()
+# 
+# 
+# # Plot
+# ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor5)) +
+#   geom_segment(arrow = arrow(length = unit(0.2, "cm")), color = "red") +
+#   geom_text_repel(aes(x = Factor1, y = Factor5, label = Variable), size = 4) +
+#   coord_equal() +
+#   xlim(-1.5, 1.5) + ylim(-1.5, 1.5) +
+#   labs(title = "Factor Analysis Loadings Biplot",
+#        x = "Factor 1", y = "Factor 5") +
+#   theme_minimal()
+# 
 
-# Plot
-ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor4)) +
-  geom_segment(arrow = arrow(length = unit(0.2, "cm")), color = "red") +
-  geom_text_repel(aes(x = Factor1, y = Factor4, label = Variable), size = 4) +
-  coord_equal() +
-  xlim(-1.5, 1.5) + ylim(-1.5, 1.5) +
-  labs(title = "Factor Analysis Loadings Biplot",
-       x = "Factor 1", y = "Factor 4") +
-  theme_minimal()
 
 
-# Plot
-ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor5)) +
-  geom_segment(arrow = arrow(length = unit(0.2, "cm")), color = "red") +
-  geom_text_repel(aes(x = Factor1, y = Factor5, label = Variable), size = 4) +
-  coord_equal() +
-  xlim(-1.5, 1.5) + ylim(-1.5, 1.5) +
-  labs(title = "Factor Analysis Loadings Biplot",
-       x = "Factor 1", y = "Factor 5") +
-  theme_minimal()
-
-
-
-
-dat_combined <- cbind(dat_scaled, fa_scores)
+dat_combined2 <- cbind(dat_no_ub_scaled, fa_scores)
 
 
 

@@ -1,0 +1,385 @@
+---
+title: "Final two model configurations"
+output: html_document
+date: '2025-04-29'
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+## Started April 29, 2025
+## by Daniel Forrest ##
+
+rm(list=ls()) 
+options(stringsAsFactors = FALSE)
+options(mc.cores = parallel::detectCores())
+```
+
+
+
+```{r}
+## load libraries
+library(tidyr)
+library(rstan)
+library(here)
+library(haven)
+library(shinystan)
+library(ggplot2)
+library(fitdistrplus)
+library(pscl)
+library(MASS)
+library(gamlss)
+library(gamlss.data)
+library(purrr)
+library(dplyr)
+library(bayesplot)
+library(stringr)
+here()
+```
+
+
+### import empirical data
+```{r}
+### read empirical data
+load(file = here("data", "dat_final_750.Rdata"))
+load(file = here("data", "dat_no_ub_750.Rdata"))
+
+```
+
+
+###########
+### Two predictors in ZILN
+## One in Bernoulli
+### changed Bernoulli
+## hierarchy introduced
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_final),
+  J = 12,
+  site_id = dat_final$site_id,
+  X1 = dat_final$Factor1,
+  X2 = dat_final$Factor2,
+  P1 = dat_final$service_road_weight,
+  fw_score_weighted = dat_no_ub$fw_score_weighted
+)
+```
+
+```{r}
+fit_hier_A_FA1_FA2_B_roadweight_noub <- stan(
+  file = here("src","fw_hier_2pred_ZILN_1pred_bern.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+save(fit_hier_A_FA1_FA3_B_roadweight_noub, file = here("data","fit_hier_A_FA1_FA3_B_roadweight_noub_corefactors.Rdata"))
+```
+```{r}
+# Extract samples
+posterior_samples <- rstan::extract(fit_hier_A_FA1_FA3_B_roadweight_noub)
+
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- posterior_samples$pi_pred # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_no_ub$fw_score_weighted  # Replace with actual observed data
+pi_obs <- ifelse(dat_no_ub$fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+
+
+
+# Explore distributions
+hist(posterior_samples$mu0, breaks = 40, main = "mu0", col = "skyblue")
+hist(posterior_samples$tau_mu, breaks = 40, main = "tau_mu", col = "salmon")
+hist(posterior_samples$mu, breaks = 40, main = "mu = mu0 + tau_mu * mu_raw", col = "lightgreen")
+hist(posterior_samples$sigma, breaks = 40, main = "sigma", col = "lightblue")
+hist(posterior_samples$beta1, breaks = 40, main = "beta1", col = "pink")
+hist(posterior_samples$beta2, breaks = 40, main = "beta2", col = "purple")
+hist(posterior_samples$gamma, breaks = 40, main = "gamma", col = "yellow")
+hist(posterior_samples$delta1, breaks = 40, main = "delta1", col = "orange")
+
+
+set.seed(123)  # for reproducibility
+sample_rows <- sample(1:nrow(y_rep), 50)  # randomly pick 50 rows
+
+
+ppc_dens_overlay(y_obs, y_rep[sample_rows,])  # Plot overlay of observed vs simulated densities
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[sample_rows, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Convert posterior predictive samples to a long format
+pi_pred_df <- as.data.frame(pi_pred)
+pi_pred_long <- pi_pred_df %>%
+  pivot_longer(cols = everything(), names_to = "Iteration", values_to = "pi_pred")
+# Calculate the mean of pi_obs
+mean_pi_obs <- mean(pi_obs, na.rm = TRUE)
+
+# Create the plot
+ggplot(pi_pred_long, aes(x = pi_pred)) +
+  geom_histogram(binwidth = 0.005, fill = "lightblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", linewidth = 1) +  # Add red vertical line
+  labs(title = "Posterior Predictive Check for pi",
+       x = "Predicted pi",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+```{r}
+#y_obs: your observed data
+# y_rep: posterior predictive draws (matrix), each row is a draw, columns = N observations
+
+# Function to compute proportion of zeros
+prop_zeros <- function(y) mean(y == 0)
+
+# Compute proportion of zeros for each posterior predictive draw
+prop_zeros_sim <- apply(y_rep, 1, prop_zeros)
+
+# Compute proportion of zeros in observed data
+prop_zeros_obs <- mean(y_obs == 0)
+
+# Plot
+ppc_stat(y = y_obs, yrep = y_rep, stat = "prop_zeros") +
+  geom_vline(xintercept = prop_zeros_obs, color = "red", linetype = "dashed", size = 1) +
+  labs(title = "Posterior Predictive Check: Proportion of Zeros",
+       x = "Proportion Zero", y = "Frequency") +
+  theme_minimal()
+
+```
+
+```{r}
+summary(y_rep[1:11696000])
+summary(dat_no_ub$fw_score_weighted)
+summary(y_obs)
+summary(pi_obs)
+summary(pi_pred[1:11696000])
+```
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means",breaks = 40)
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+```{r}
+# Convert y_rep to data frame and add draw number
+y_rep_df <- as.data.frame(y_rep) %>%
+  mutate(draw = row_number())
+
+site_id <- dat_no_ub_scaled$site_id  # Or however it's stored in your data
+
+site_legend <- data.frame(
+  site = dat_no_ub_scaled$site,
+  site_id = dat_no_ub_scaled$site_id
+)
+
+site_legend_unique <- unique(site_legend)
+site_legend_unique <- site_legend_unique[order(site_legend_unique$site_id), ]
+
+
+# Pivot to long format
+y_rep_long <- y_rep_df %>%
+  tidyr::pivot_longer(-draw, names_to = "obs", values_to = "y") %>%
+  mutate(obs = as.integer(str_remove(obs, "^V")),
+         site = site_id[obs])
+
+site_means <- y_rep_long %>%
+  group_by(draw, site) %>%
+  summarise(mean_y = mean(y), .groups = "drop")
+
+# ggplot(site_means, aes(x = factor(site), y = mean_y)) +
+#   geom_boxplot(fill = "skyblue", alpha = 0.7) +
+#   labs(title = "Posterior Predictive Means per Site",
+#        x = "Site",
+#        y = "Mean Predicted Food Waste") +
+#   theme_minimal()
+# 
+# 
+# ggplot(site_means, aes(x = factor(site), y = mean_y)) +
+#   geom_boxplot(fill = "skyblue", alpha = 0.7) +
+#   scale_x_discrete(
+#     labels = site_legend_unique$site
+#   ) +
+#   labs(title = "Posterior Predictive Means per Site",
+#        x = "Site",
+#        y = "Mean Predicted Food Waste") +
+#   theme_minimal() +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Optional for readability
+
+
+# Compute overall means per site to reorder
+site_order <- site_means %>%
+  group_by(site) %>%
+  summarise(overall_mean = mean(mean_y), .groups = "drop") %>%
+  arrange(desc(overall_mean)) %>%  # Order in descending order
+  mutate(site = factor(site, levels = site))  # ensures the order is preserved
+
+# Join ordered factor levels to site_means
+site_means <- site_means %>%
+  mutate(site = factor(site, levels = site_order$site))
+
+# Make sure site_legend_unique has the correct order
+site_legend_unique <- site_legend_unique %>%
+  mutate(site_id = as.integer(site_id)) %>%
+  arrange(match(site_id, levels(site_means$site)))
+
+# Plot with violin and mean line
+ggplot(site_means, aes(x = site, y = mean_y)) +
+  geom_violin(fill = "skyblue", alpha = 0.7, scale = "width", trim = FALSE) +
+  stat_summary(fun = mean, geom = "point", shape = 23, size = 3, fill = "red") +
+  scale_x_discrete(labels = site_legend_unique$site) +
+  labs(
+    title = "Posterior Predictive Means per Site (Ordered by Mean)",
+    x = "Site",
+    y = "Mean Predicted Food Waste"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+
+
+
+
+###########
+### Two predictors in ZILN
+## One in Bernoulli
+### changed Bernoulli
+
+
+```{r}
+# Prepare data for Stan model (no hierarchy)
+stan_data <- list(
+  N = nrow(dat_final),
+  X1 = dat_final$Factor1,
+  X2 = dat_final$Factor3,
+  P1 = dat_final$service_road_weight,
+  fw_score_weighted = dat_no_ub$fw_score_weighted
+)
+```
+
+```{r}
+fit_A_FA1_FA3_B_roadweight_noub <- stan(
+  file = here("src","fw_2pred_ZILN_1pred_bern.stan"),  # Path to the Stan model
+  data = stan_data, 
+  chains = 4, 
+  iter = 2000, 
+)
+```
+
+```{r}
+save(fit_A_FA1_FA3_B_roadweight_noub, file = here("data","fit_A_FA1_FA3_B_roadweight_noub.Rdata"))
+```
+```{r}
+# Extract samples
+posterior_samples <- rstan::extract(fit_A_FA1_FA3_B_roadweight_noub)
+
+# Extract posterior samples
+y_rep <- posterior_samples$fw_score_pred  # Change "y_rep" based on how you named your predicted values
+pi_pred <- posterior_samples$pi_pred # Change "y_rep" based on how you named your predicted values
+y_obs <- dat_no_ub$fw_score_weighted  # Replace with actual observed data
+pi_obs <- ifelse(dat_no_ub$fw_score_weighted > 0 , 0, 1)  # Convert to binary presence/absence
+
+
+
+# Explore distributions
+hist(posterior_samples$mu, breaks = 40, main = "mu", col = "lightgreen")
+hist(posterior_samples$sigma, breaks = 40, main = "sigma", col = "lightblue")
+hist(posterior_samples$beta1, breaks = 40, main = "beta1", col = "pink")
+hist(posterior_samples$beta2, breaks = 40, main = "beta2", col = "purple")
+hist(posterior_samples$gamma, breaks = 40, main = "gamma", col = "yellow")
+hist(posterior_samples$delta1, breaks = 40, main = "delta1", col = "orange")
+
+
+set.seed(123)  # for reproducibility
+sample_rows <- sample(1:nrow(y_rep), 50)  # randomly pick 50 rows
+
+
+ppc_dens_overlay(y_obs, y_rep[sample_rows,])  # Plot overlay of observed vs simulated densities
+
+
+# Plot overlay of observed vs simulated densities with x-axis range 0 to 4
+ppc_dens_overlay(y_obs, y_rep[sample_rows, ]) +
+  xlim(0.001,1) +
+  labs(title = "Posterior Predictive Check (X Range: 0 to 1)",
+       x = "Food Waste Score",
+       y = "Density") +
+  theme_minimal()
+
+
+# Convert posterior predictive samples to a long format
+pi_pred_df <- as.data.frame(pi_pred)
+pi_pred_long <- pi_pred_df %>%
+  pivot_longer(cols = everything(), names_to = "Iteration", values_to = "pi_pred")
+# Calculate the mean of pi_obs
+mean_pi_obs <- mean(pi_obs, na.rm = TRUE)
+
+# Create the plot
+ggplot(pi_pred_long, aes(x = pi_pred)) +
+  geom_histogram(binwidth = 0.005, fill = "lightblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = mean_pi_obs, color = "red", linetype = "dashed", linewidth = 1) +  # Add red vertical line
+  labs(title = "Posterior Predictive Check for pi",
+       x = "Predicted pi",
+       y = "Frequency") +
+  theme_minimal()
+
+```
+```{r}
+#y_obs: your observed data
+# y_rep: posterior predictive draws (matrix), each row is a draw, columns = N observations
+
+# Function to compute proportion of zeros
+prop_zeros <- function(y) mean(y == 0)
+
+# Compute proportion of zeros for each posterior predictive draw
+prop_zeros_sim <- apply(y_rep, 1, prop_zeros)
+
+# Compute proportion of zeros in observed data
+prop_zeros_obs <- mean(y_obs == 0)
+
+# Plot
+ppc_stat(y = y_obs, yrep = y_rep, stat = "prop_zeros") +
+  geom_vline(xintercept = prop_zeros_obs, color = "red", linetype = "dashed", size = 1) +
+  labs(title = "Posterior Predictive Check: Proportion of Zeros",
+       x = "Proportion Zero", y = "Frequency") +
+  theme_minimal()
+
+```
+
+```{r}
+summary(y_rep[1:11696000])
+summary(dat_no_ub$fw_score_weighted)
+summary(y_obs)
+summary(pi_obs)
+summary(pi_pred[1:11696000])
+```
+
+
+```{r}
+mean_observed <- mean(y_obs)
+mean_simulated <- apply(y_rep, 1, mean)
+hist(mean_simulated, probability = TRUE, main = "Posterior Predictive Means",breaks = 40)
+abline(v = mean_observed, col = "blue", lwd = 2)
+```
+
+
+

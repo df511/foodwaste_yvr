@@ -131,7 +131,7 @@ dev.off()
 # Define output file name and resolution
 pdf(here("figs","pct_rent_subsidized_map_750m.pdf"), width = 80, height = 64)  # Adjust size as needed
 
-ggplot(dat_grid_final) +
+ggplot(dat_combined) +
   geom_sf(aes(fill = pct_rent_subsidized), color = NA) +  # No borders for a smooth heatmap
   scale_fill_viridis_c(option = "inferno", name = "pct_rent_subsidized") +  # "inferno" for bright-darker range
   theme_minimal() +
@@ -911,4 +911,94 @@ ggplot(dat_grid_final) +
   theme(panel.grid = element_blank())
 
 dev.off()
+
+
+
+# Save plot to PDF
+pdf(here("figs","avg_household_size_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = avg_household_size), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "avg_household_size") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+
+pdf(here("figs","avg_household_size_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_grid_final) +
+  geom_sf(aes(fill = avg_household_size), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "avg_household_size") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+pdf(here("figs","Factor1_750m_2.pdf"), width = 20, height = 15)
+
+ggplot(dat_combined) +
+  geom_sf(aes(fill = Factor1), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "Factor1") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+pdf(here("figs","Factor2_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_combined) +
+  geom_sf(aes(fill = Factor2), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "Factor2") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+
+pdf(here("figs","Factor3_750m.pdf"), width = 20, height = 15)
+
+ggplot(dat_combined) +
+  geom_sf(aes(fill = Factor3), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "Factor2") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+pdf(here("figs", "fw_score_weighted_750m.pdf"), width = 10, height = 8)
+
+ggplot(dat_no_ub) +
+  geom_sf(aes(fill = fw_score_weighted), color = NA) +
+  scale_fill_viridis_c(
+    option = "inferno",
+    name = "fw_score_weighted",
+    limits = c(0.0000001, 0.5)  # Set min and max of color scale
+  ) +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
+
+
+
+
+# Save plot to PDF
+pdf(here("figs","van_service_road_weight_750m.pdf"), width = 20, height = 15)
+
+ggplot(van_dat) +
+  geom_sf(aes(fill = service_road_weight), color = NA) +  # Fill grid by road length
+  scale_fill_viridis_c(option = "inferno", name = "service_road_weight") +
+  theme_minimal() +
+  theme(panel.grid = element_blank())
+
+dev.off()
+
 ```
