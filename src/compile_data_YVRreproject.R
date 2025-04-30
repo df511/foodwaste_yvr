@@ -59,6 +59,8 @@ gen_roads <- TRUE
 gen_finalmods <- TRUE
 ### Module 9: read in property values from tax data
 gen_center_std <- TRUE
+### Module 10: conduct a factor analysis
+gen_factanal <- TRUE
 
 
 #########################################################################################################
@@ -433,7 +435,7 @@ if (gen_lc) {
 
 
 van_dat <- van_dat %>%
-  filter(!is.na(van_dat$renters))  # Removes rows with empty geometries
+  filter(!is.na(van_dat$renters))  # Removes rows empty of census data
 
 #########################################################################################################
 ############## Module 5: read in food retail location data #################
@@ -806,10 +808,7 @@ if (gen_finalmods) {
   van_dat <- van_dat %>%
     mutate(across(where(is.numeric), ~replace_na(., 0)))
   
-  van_dat <- van_dat %>%
-    select(-name) ### remove "name" column. No use for it and is NA for all grid cells in pacific spirit ("lancaster_ub") transect. Causes problems.
-  
-  
+  van_dat <- van_dat %>% select(-name.y, -business_name, -retail_category)
   
   save(van_dat, file = here("data","van_dat_demo_lc_retail_shelters_roads_mods_750.Rdata"))
   
@@ -848,10 +847,8 @@ if (gen_center_std) {
 if (gen_factanal) {
   ## Factor Analysis of Housing Vars
   
-  my_data <- van_dat_scaled %>% select(where(is.numeric))
-  my_data <- as.data.frame(my_data)
-  my_data <- my_data[, colSums(is.na(my_data)) == 0]  # Remove NA columns
-  
+  load(file = here("data", "loadings_matrix.Rdata"))
+  loadings_matrix <- unclass(loadings_matrix)
   
   # Define the variables to keep in the heatmap
   selected_vars <- c("rent_pct","nearest_shelter_dist","nearest_food_retail", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct",
@@ -862,110 +859,15 @@ if (gen_factanal) {
   
   
   # Ensure the selected variables exist in the dataset
-  selected_vars <- selected_vars[selected_vars %in% colnames(my_data)]
+  van_dat_factors <- van_dat_scaled %>% select(any_of(selected_vars))
+  van_dat_matrix <- as.matrix(van_dat_factors)
+  van_dat_matrix <- van_dat_matrix[,1:17]
+  storage.mode(van_dat_matrix) <- "double"  # Just to be sure
   
-  # Subset data to only include selected variables
-  my_data_subset <- my_data[, selected_vars]
+  # Then project:
+  factor_scores <- van_dat_matrix %*% loadings_matrix
   
-  # Ensure no missing values
-  my_data_subset <- na.omit(my_data_subset)
-  
-  # Compute eigenvalues of the correlation matrix
-  eigen_vals <- eigen(cor(my_data_subset))$values
-  
-  # Scree plot
-  plot(eigen_vals, type = "b", pch = 19,
-       main = "Scree Plot",
-       xlab = "Factor Number", ylab = "Eigenvalue")
-  abline(h = 1, col = "red", lty = 2)  # Kaiser criterion line
-  
-  
-  # Set number of factors to extract
-  num_factors <- 3
-  
-  # Perform factor analysis
-  fa_result <- factanal(my_data_subset, factors = num_factors, rotation = "varimax", scores = "regression")
-  
-  fa_scores <-as.data.frame(fa_result$scores)
-  
-  # View summary of the result
-  print(fa_result)
-  
-  # Extract factor loadings
-  loadings_df <- data.frame(fa_result$loadings[, 1:num_factors])
-  loadings_df$Variable <- rownames(loadings_df)
-  loadings_melted <- melt(loadings_df, id.vars = "Variable", variable.name = "Factor", value.name = "Loading")
-  
-  # Plot factor loadings
-  fa_loadings_plot <- ggplot(loadings_melted, aes(x = Variable, y = Loading, fill = Factor)) +
-    geom_bar(stat = "identity", position = "dodge") +
-    labs(title = "Factor Loadings", x = "Variable", y = "Loading") +
-    theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  
-  print(fa_loadings_plot)
-  
-  
-  
-  # Convert to data frame for plotting
-  loadings_df <- as.data.frame(unclass(fa_result$loadings))
-  loadings_df$Variable <- rownames(loadings_df)
-  
-  # Reshape to long format manually
-  loadings_long <- reshape(loadings_df, 
-                           varying = names(loadings_df)[1:num_factors], 
-                           v.names = "Loading",
-                           timevar = "Factor",
-                           times = paste0("Factor", 1:num_factors),
-                           direction = "long")
-  
-  # Plot (using base R barplot)
-  par(mar = c(10, 4, 4, 2))  # increase bottom margin
-  with(loadings_long, {
-    barplot(Loading, names.arg = Variable, las = 2,
-            main = "Factor Loadings", col = as.factor(Factor))
-  })
-  
-  # Extract and scale loadings
-  loadings <- fa_result$loadings[, 1:3]
-  
-  
-  # Convert to data frame
-  loadings_df <- as.data.frame(loadings)
-  loadings_df$Variable <- rownames(loadings_df)
-  
-  # Optional: scale loadings for visibility
-  scale_factor <- 1.5
-  loadings_df$Factor1 <- loadings_df[,1] * scale_factor
-  loadings_df$Factor2 <- loadings_df[,2] * scale_factor
-  loadings_df$Factor3 <- loadings_df[,3] * scale_factor
-  
-  # Plot
-  ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor2)) +
-    geom_segment(arrow = arrow(length = unit(0.2, "cm")), color = "red") +
-    geom_text_repel(aes(x = Factor1, y = Factor2, label = Variable), size = 4) +
-    coord_equal() +
-    xlim(-1.5, 1.5) + ylim(-1.5, 1.5) +
-    labs(title = "Factor Analysis Loadings Biplot",
-         x = "Factor 1", y = "Factor 2") +
-    theme_minimal()
-  
-  
-  
-  # Plot
-  ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor3)) +
-    geom_segment(arrow = arrow(length = unit(0.2, "cm")), color = "red") +
-    geom_text_repel(aes(x = Factor1, y = Factor3, label = Variable), size = 4) +
-    coord_equal() +
-    xlim(-1.5, 1.5) + ylim(-1.5, 1.5) +
-    labs(title = "Factor Analysis Loadings Biplot",
-         x = "Factor 1", y = "Factor 3") +
-    theme_minimal()
-  
-  
-  
-  
-  van_dat <- cbind(van_dat_scaled, fa_scores)
+  van_dat <- cbind(van_dat_scaled, factor_scores)
   save(van_dat, file = here("data", "van_dat_final_750.Rdata"))
   
   
