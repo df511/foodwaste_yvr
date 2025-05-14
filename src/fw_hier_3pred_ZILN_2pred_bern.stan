@@ -46,7 +46,7 @@ transformed parameters {
 // Model block
 model {
   // Hyperpriors
-  mu0 ~ normal(-4.5, 3);
+  mu0 ~ normal(-5, 2);
   tau_mu ~ normal(0, 1);
   mu_raw ~ normal(0, 1);
 

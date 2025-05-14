@@ -44,7 +44,7 @@ transformed parameters {
 // Model block
 model {
   // Hyperpriors
-  mu0 ~ normal(-4.5, 3);
+  mu0 ~ normal(-5, 2);
   tau_mu ~ normal(0, 1);
   mu_raw ~ normal(0, 1);
 
@@ -54,7 +54,7 @@ model {
   beta3 ~ normal(0, 1);
   sigma ~ normal(0, 1);
 
-  gamma ~ normal(0.8, 0.2);
+  gamma ~ normal(1, 1);
   delta1 ~ normal(0, 1);
 
   // Likelihood

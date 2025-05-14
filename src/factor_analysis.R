@@ -29,6 +29,10 @@ my_data <- my_data[, colSums(is.na(my_data)) == 0]  # Remove NA columns
 #                    "latinamerican_pct","chinese_pct", "korean_pct", "japanese_pct", "southeastasian_pct", "southasian_pct", "arab_pct", "notvisminority_pct", "black_pct","filipino_pct")  # Replace with actual column names
 # 
 
+selected_vars <- c("rent_pct","nearest_shelter_dist","nearest_food_retail", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct",
+                   "female_pct","one_parent_pct", "avg_household_size","housing_highdensity", "housing_lowdensity",
+                   "pct_major_repairs", "pct_rent_thirty", "pct_rent_subsidized", "pct_unsuitable_housing")
+
 # Define the variables to keep in the heatmap
 selected_vars <- c("rent_pct","nearest_shelter_dist","nearest_food_retail", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct",
                    "female_pct","one_parent_pct", "avg_household_size","housing_highdensity", "housing_lowdensity",

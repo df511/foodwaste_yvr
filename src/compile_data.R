@@ -331,7 +331,8 @@ weights_state <- c( "food_litter" = 1, ### probably increase...
                     "NA" = 0)
 
 
-# Define weights for each bin_form  
+
+# Define weights for each bin_form
 weights_form <- c("dumpster" = 15,
                   "tote" = 3,
                   "home_bin" = 1,
@@ -360,14 +361,25 @@ weights_fld <- c("<visible" = 0.05,
 
 
 # Vectorized lookup using match() instead of sapply()
+# dat_sf <- dat_sf %>%
+#   mutate(
+#     state_weight = weights_state[match(bin_state, names(weights_state))],
+#     form_weight = weights_form[match(bin_form, names(weights_form))],
+#     type_weight = weights_type[match(waste_type, names(weights_type))],
+#     fld_weight = weights_fld[match(fl_density, names(weights_fld))],
+#     weighted_value = bin_count * state_weight * form_weight * type_weight
+#   )
+
 dat_sf <- dat_sf %>%
   mutate(
     state_weight = weights_state[match(bin_state, names(weights_state))],
     form_weight = weights_form[match(bin_form, names(weights_form))],
     type_weight = weights_type[match(waste_type, names(weights_type))],
     fld_weight = weights_fld[match(fl_density, names(weights_fld))],
-    weighted_value = bin_count * state_weight * form_weight * type_weight
+    weighted_value = bin_count * state_weight * form_weight * type_weight *
+      if_else(bin_state == "food_litter", fld_weight, 1)
   )
+
 
 # 
 # 
@@ -458,7 +470,7 @@ census_data <- get_census(dataset = 'CA21', regions = list(CSD = "5915022"),
                                       "v_CA21_4911","v_CA21_4914",
                                       "v_CA21_9", "v_CA21_10", "v_CA21_8", ## gender
                                       "v_CA21_4297", "v_CA21_4298", "v_CA21_4299", "v_CA21_4300","v_CA21_4314","v_CA21_4315", "v_CA21_4316","v_CA21_4260", "v_CA21_4261","v_CA21_4272","v_CA21_4273","v_CA21_4274", ##housing suitability, repairs...
-                                      "v_CA21_435","v_CA21_436","v_CA21_437","v_CA21_438", "v_CA21_439", "v_CA21_440", ##housing types; https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=144257
+                                      "v_CA21_434","v_CA21_435","v_CA21_436","v_CA21_437","v_CA21_438", "v_CA21_439", "v_CA21_440", ##housing types; https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=144257
                                       "v_CA21_4392", "v_CA21_4401", "v_CA21_4407", "v_CA21_4410", ##immigration... citizens/non-citizens, non-immigrants, immigrants
                                       "v_CA21_4923", "v_CA21_4938", ### ethnicity, English, Chinese, re: Ley 1995
                                       "v_CA21_507", "v_CA21_499", ### total one parent families, total families
@@ -507,25 +519,25 @@ census_data <- get_census(dataset = 'CA21', regions = list(CSD = "5915022"),
 # clean_var9 <- gsub("\\\\", "", var)
 
 
-var <- colnames(census_data[,83])
-var <- var[1]
-clean_var10 <- gsub("\\\\", "", var)
 var <- colnames(census_data[,84])
 var <- var[1]
-clean_var11 <- gsub("\\\\", "", var)
+clean_var10 <- gsub("\\\\", "", var)
 var <- colnames(census_data[,85])
 var <- var[1]
-clean_var12 <- gsub("\\\\", "", var)
+clean_var11 <- gsub("\\\\", "", var)
 var <- colnames(census_data[,86])
 var <- var[1]
-clean_var13 <- gsub("\\\\", "", var)
+clean_var12 <- gsub("\\\\", "", var)
 var <- colnames(census_data[,87])
 var <- var[1]
-clean_var14 <- gsub("\\\\", "", var)
+clean_var13 <- gsub("\\\\", "", var)
 var <- colnames(census_data[,88])
 var <- var[1]
-clean_var15 <- gsub("\\\\", "", var)
+clean_var14 <- gsub("\\\\", "", var)
 var <- colnames(census_data[,89])
+var <- var[1]
+clean_var15 <- gsub("\\\\", "", var)
+var <- colnames(census_data[,90])
 var <- var[1]
 clean_var16 <- gsub("\\\\", "", var)
 
@@ -874,7 +886,7 @@ dat_grid_final <- with_progress({
   
 })
 
-dat_grid_final <- dat_grid_final[,-c(139:143)]
+dat_grid_final <- dat_grid_final[,-c(140:144)]
 
 #### gen nearest food retailer column
 dat_grid_final <- dat_grid_final %>%
@@ -1025,8 +1037,8 @@ dat_grid_final$NaturalVegSum2 <- dat_grid_final$Conifer +dat_grid_final$Deciduou
 dat_grid_final$NaturalVegSum <- dat_grid_final$Conifer +dat_grid_final$Deciduous+dat_grid_final$Shrub +dat_grid_final$NatGrassHerb
 dat_grid_final$BuiltSum <- dat_grid_final$Paved+dat_grid_final$Buildings+dat_grid_final$OtherBuilt
 dat_grid_final$GrassSoilSum <- dat_grid_final$ModGrassHerb + dat_grid_final$Soil
-dat_grid_final$housing_lowdensity <- dat_grid_final$single_detached + dat_grid_final$semi_detached + dat_grid_final$row_houses ### rowhouses may need to be removed, because vancouver doesn't uniformly service ALL of these
-dat_grid_final$housing_highdensity <- dat_grid_final$apt_flat + dat_grid_final$low_rise + dat_grid_final$high_rise
+dat_grid_final$housing_lowdensity <- (dat_grid_final$single_detached + dat_grid_final$semi_detached + dat_grid_final$row_houses)/dat_grid_final$`v_CA21_434: Occupied private dwellings by structural type of dwelling data` ### rowhouses may need to be removed, because vancouver doesn't uniformly service ALL of these
+dat_grid_final$housing_highdensity <- (dat_grid_final$apt_flat + dat_grid_final$low_rise + dat_grid_final$high_rise)/dat_grid_final$`v_CA21_434: Occupied private dwellings by structural type of dwelling data`
 dat_grid_final$housing_suitability <- dat_grid_final$`v_CA21_4261: Suitable`/dat_grid_final$`v_CA21_4260: Total - Private households by housing suitability`
 dat_grid_final$pct_unsuitable_housing <- 1 - dat_grid_final$housing_suitability
 dat_grid_final$pct_unsuitable_housing[dat_grid_final$pct_unsuitable_housing == 1] <- 0 ### replaces Pacific Spirit and Ocean near 2nd beach with 0s (i.e., no housing at all)
@@ -1111,7 +1123,7 @@ my_data <- my_data[, colSums(is.na(my_data)) == 0]  # Remove NA columns
 
 # Define the variables to keep in the heatmap
 selected_vars <- c("rent_pct","nearest_shelter_dist","nearest_food_retail", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct",
-                   "female_pct","one_parent_pct", "avg_household_size","housing_highdensity", "housing_lowdensity",
+                   "female_pct","one_parent_pct", "avg_household_size","housing_highdensity",
                    "pct_major_repairs", "pct_rent_thirty", "pct_rent_subsidized", "pct_unsuitable_housing")
 
 
@@ -1141,6 +1153,10 @@ num_factors <- 3
 
 # Perform factor analysis
 fa_result <- factanal(my_data_subset, factors = num_factors, rotation = "varimax", scores = "regression")
+
+
+loadings_matrix <- fa_result$loadings  # or fa_model$weights for regression method
+
 
 fa_scores <-as.data.frame(fa_result$scores)
 
@@ -1196,6 +1212,11 @@ loadings_df$Factor1 <- loadings_df[,1] * scale_factor
 loadings_df$Factor2 <- loadings_df[,2] * scale_factor
 loadings_df$Factor3 <- loadings_df[,3] * scale_factor
 
+
+# Save plot to PDF
+pdf(here("figs","FA12.pdf"), width = 10, height = 8)
+
+
 # Plot
 ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor2)) +
   geom_segment(arrow = arrow(length = unit(0.2, "cm")), color = "red") +
@@ -1206,7 +1227,10 @@ ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor2)) +
        x = "Factor 1", y = "Factor 2") +
   theme_minimal()
 
+dev.off()
 
+# Save plot to PDF
+pdf(here("figs","FA13.pdf"), width = 10, height = 8)
 
 # Plot
 ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor3)) +
@@ -1218,12 +1242,27 @@ ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor1, yend = Factor3)) +
        x = "Factor 1", y = "Factor 3") +
   theme_minimal()
 
+dev.off()
 
 
+# Save plot to PDF
+pdf(here("figs","FA23.pdf"), width = 10, height = 8)
+
+# Plot
+ggplot(loadings_df, aes(x = 0, y = 0, xend = Factor2, yend = Factor3)) +
+  geom_segment(arrow = arrow(length = unit(0.2, "cm")), color = "red") +
+  geom_text_repel(aes(x = Factor2, y = Factor3, label = Variable), size = 4) +
+  coord_equal() +
+  xlim(-1.5, 1.5) + ylim(-1.5, 1.5) +
+  labs(title = "Factor Analysis Loadings Biplot",
+       x = "Factor 2", y = "Factor 3") +
+  theme_minimal()
+
+dev.off()
 
 dat_final <- cbind(dat_no_ub_scaled, fa_scores)
 save(dat_final, file = here("data", "dat_final_750.Rdata"))
-
+save(loadings_matrix, file = here("data", "loadings_matrix.Rdata"))
 
 } else {
   ## object called "dat_final"

@@ -30,17 +30,17 @@ reorder_cormat <- function(cormat){
 #### cor matrix 750. m #####
 
 
-load(file = here("data", "dat_scaled_750.Rdata"))
+load(file = here("data", "dat_no_ub_scaled_750.Rdata"))
 
-dat_scaled_no0s <- dat_scaled %>%
-  filter(fw_score_weighted > -0.1586271) ### 0 equivalent val (minimum fw_score_weighted val after scaling, not to be used as response)
-
-#check that classes are all numeric for predictor variables
-class(dat_grid_final)
-for (val in 1:82) {
-  print(val)
-  print(class(dat_grid_final[[val]]))
-}
+dat_no_ub_scaled_no0s <- dat_no_ub_scaled %>%
+  filter(fw_score_weighted > -0.1632483) ### 0 equivalent val (minimum fw_score_weighted val after scaling, not to be used as response)
+# 
+# #check that classes are all numeric for predictor variables
+# class(dat_grid_final)
+# for (val in 1:82) {
+#   print(val)
+#   print(class(dat_grid_final[[val]]))
+# }
 
 # my_data <- dat_scaled
 # my_data <- as.data.frame(my_data)
@@ -52,22 +52,33 @@ for (val in 1:82) {
 
 
 
-my_data <- dat_scaled_no0s %>% select(where(is.numeric))
+my_data <- dat_no_ub_scaled_no0s %>% select(where(is.numeric))
 my_data <- as.data.frame(my_data)
 
 my_data <- my_data[, colSums(is.na(my_data)) == 0]  # Remove NA columns
 
 
-#cormat <- cor(my_data)
-cormat <- cor(my_data[, -c(1,4,8,11,14,15,20, 21,23,24, 30:32, 91)])
+# #cormat <- cor(my_data)
+# cormat <- cor(my_data[, -c(1,4,8,11,14,15,20, 21,23,24, 30:32, 91)])
+# 
+# #cormat <- cormat[-37,-37] ### remove NA column one of the repairs needed, FIX THIS
+# 
+# # for (val in 1:79) {
+# #   print(val)
+# #   print(class(my_data[,val]))
+# # }
 
-#cormat <- cormat[-37,-37] ### remove NA column one of the repairs needed, FIX THIS
+# Define the variables to keep in the heatmap
+selected_vars <- c("rent_pct","nearest_shelter_dist","nearest_food_retail", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct",
+                   "female_pct","one_parent_pct", "avg_household_size","housing_highdensity",
+                   "pct_major_repairs", "pct_rent_thirty", "pct_rent_subsidized", "pct_unsuitable_housing")
 
-# for (val in 1:79) {
-#   print(val)
-#   print(class(my_data[,val]))
-# }
+# Ensure the selected variables exist in the dataset
+selected_vars <- selected_vars[selected_vars %in% colnames(my_data)]
 
+# Subset data to only include selected variables
+my_data_subset <- my_data[, selected_vars]
+cormat <- cor(my_data_subset)
 
 cormat <- reorder_cormat(cormat)
 lower_tri <- get_lower_tri(cormat)
@@ -75,9 +86,9 @@ melted_cormat <- melt(lower_tri)
 
 
 
-# Filter correlations greater than 0.5 (absolute value)
-melted_cormat <- melted_cormat[abs(melted_cormat$value) > 0.5, ]
-melted_cormat <- melted_cormat[complete.cases(melted_cormat), ]
+# # Filter correlations greater than 0.5 (absolute value)
+# melted_cormat <- melted_cormat[abs(melted_cormat$value) > 0.5, ]
+# melted_cormat <- melted_cormat[complete.cases(melted_cormat), ]
 
 magma_colors <- magma(10)
 
@@ -105,15 +116,6 @@ print(heatmap)
 
 
 
-
-
-
-# Define the variables to keep in the heatmap
-selected_vars <- c("rent_pct", "single_detached" ,"noncitizen_pct", 
-                   "nearest_food_retail","nearest_shelter_dist","indig_pct", 
-                   "female_pct", "SCOREMAT", "SCORESOC", "Paved", "NaturalVegSum", "BuiltSum", "GrassSoilSum", "pop_km",
-                   "household_income", "housing_highdensity", "housing_lowdensity",
-                   "thirtyonshelter_majorrepairs", "notsuitable_majorrepairs", "service_road_weight")  # Replace with actual column names
 
 # Ensure the selected variables exist in the dataset
 selected_vars <- selected_vars[selected_vars %in% colnames(my_data)]
@@ -147,11 +149,18 @@ print(heatmap)
 
 
 # Define the variables to keep in the heatmap
-selected_vars <- c("rent_pct","nearest_shelter_dist","indig_pct", 
-                   "female_pct", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct", "one_parent_pct", "avg_household_size","housing_highdensity", "housing_lowdensity",
-                   "pct_major_repairs", "pct_rent_thirty","housing_suitability", "pct_rent_subsidized", "pct_unsuitable_housing", 
-                   "latinamerican_pct","chinese_pct", "indig_pct", "korean_pct", "japanese_pct", "southeastasian_pct", "southasian_pct", "arab_pct", "notvisminority_pct", "black_pct","filipino_pct")  # Replace with actual column names
+selected_vars <- c("rent_pct","nearest_shelter_dist","nearest_food_retail", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct",
+                   "female_pct","one_parent_pct", "avg_household_size","housing_highdensity",
+                   "pct_major_repairs", "pct_rent_thirty", "pct_rent_subsidized", "pct_unsuitable_housing")
 
+# 
+# 
+# # Define the variables to keep in the heatmap
+# selected_vars <- c("rent_pct","nearest_shelter_dist","indig_pct", 
+#                    "female_pct", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct", "one_parent_pct", "avg_household_size","housing_highdensity", "housing_lowdensity",
+#                    "pct_major_repairs", "pct_rent_thirty","housing_suitability", "pct_rent_subsidized", "pct_unsuitable_housing", 
+#                    "latinamerican_pct","chinese_pct", "indig_pct", "korean_pct", "japanese_pct", "southeastasian_pct", "southasian_pct", "arab_pct", "notvisminority_pct", "black_pct","filipino_pct")  # Replace with actual column names
+# 
 
 
 

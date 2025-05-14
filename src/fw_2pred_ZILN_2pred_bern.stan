@@ -34,13 +34,14 @@ transformed parameters {
 // Model block
 model {
   // Priors
-  mu ~ normal(0, 2);            // Slightly wider prior
-  beta1 ~ normal(0, 2);          // Slightly wider prior
-  sigma ~ normal(0, 1);         // Weakly informative prior
+  mu ~ normal(-3.5, 1);            // Slightly wider prior
+  beta1 ~ normal(0, 0.5);          // Slightly wider prior
+  beta2 ~ normal(0, 0.5);          // Slightly wider prior
+  sigma ~ normal(0, 0.5);         // Weakly informative prior
 
-  gamma ~ normal(0, 1);        // Prior for zero-inflation intercept
-  delta1 ~ normal(0, 1);        // Prior for zero-inflation predictor effect
-  delta2 ~ normal(0, 1);        // Prior for zero-inflation predictor effect
+  gamma ~ normal(1, 1);        // Prior for zero-inflation intercept
+  delta1 ~ normal(0, 0.5);        // Prior for zero-inflation predictor effect
+  delta2 ~ normal(0, 0.5);        // Prior for zero-inflation predictor effect
 
   // Likelihood using zero-inflated lognormal distribution
   for (n in 1:N) {

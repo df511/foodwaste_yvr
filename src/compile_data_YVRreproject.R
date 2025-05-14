@@ -32,6 +32,7 @@ library(FNN)
 library(reshape2)
 library(ggrepel)
 library(gridExtra)
+library(spatstat)
 
 
 
@@ -195,7 +196,7 @@ if (gen_demog) {
                                         "v_CA21_4911","v_CA21_4914",
                                         "v_CA21_9", "v_CA21_10", "v_CA21_8", ## gender
                                         "v_CA21_4297", "v_CA21_4298", "v_CA21_4299", "v_CA21_4300","v_CA21_4314","v_CA21_4315", "v_CA21_4316","v_CA21_4260", "v_CA21_4261","v_CA21_4272","v_CA21_4273","v_CA21_4274", ##housing suitability, repairs...
-                                        "v_CA21_435","v_CA21_436","v_CA21_437","v_CA21_438", "v_CA21_439", "v_CA21_440", ##housing types; https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=144257
+                                        "v_CA21_434","v_CA21_435","v_CA21_436","v_CA21_437","v_CA21_438", "v_CA21_439", "v_CA21_440", ##housing types; https://www23.statcan.gc.ca/imdb/p3VD.pl?Function=getVD&TVD=144257
                                         "v_CA21_4392", "v_CA21_4401", "v_CA21_4407", "v_CA21_4410", ##immigration... citizens/non-citizens, non-immigrants, immigrants
                                         "v_CA21_4923", "v_CA21_4938", ### ethnicity, English, Chinese, re: Ley 1995
                                         "v_CA21_507", "v_CA21_499", ### total one parent families, total families
@@ -244,25 +245,25 @@ if (gen_demog) {
   # clean_var9 <- gsub("\\\\", "", var)
   
   
-  var <- colnames(census_data[,83])
-  var <- var[1]
-  clean_var10 <- gsub("\\\\", "", var)
   var <- colnames(census_data[,84])
   var <- var[1]
-  clean_var11 <- gsub("\\\\", "", var)
+  clean_var10 <- gsub("\\\\", "", var)
   var <- colnames(census_data[,85])
   var <- var[1]
-  clean_var12 <- gsub("\\\\", "", var)
+  clean_var11 <- gsub("\\\\", "", var)
   var <- colnames(census_data[,86])
   var <- var[1]
-  clean_var13 <- gsub("\\\\", "", var)
+  clean_var12 <- gsub("\\\\", "", var)
   var <- colnames(census_data[,87])
   var <- var[1]
-  clean_var14 <- gsub("\\\\", "", var)
+  clean_var13 <- gsub("\\\\", "", var)
   var <- colnames(census_data[,88])
   var <- var[1]
-  clean_var15 <- gsub("\\\\", "", var)
+  clean_var14 <- gsub("\\\\", "", var)
   var <- colnames(census_data[,89])
+  var <- var[1]
+  clean_var15 <- gsub("\\\\", "", var)
+  var <- colnames(census_data[,90])
   var <- var[1]
   clean_var16 <- gsub("\\\\", "", var)
   
@@ -366,13 +367,54 @@ if (gen_demog) {
   
   census_data <- st_transform(census_data, st_crs(grid_vancouver)) ### ensure the same CRS
   
+  # Loop through all columns with missing values in the census_data dataset
+  for (col in names(census_data)) {
+    # Check if the column contains any NAs
+    if (any(is.na(census_data[[col]]))) {
+      # Calculate the median (ignoring NAs) and replace NAs with the median
+      median_value <- median(census_data[[col]], na.rm = TRUE)
+      census_data[[col]][is.na(census_data[[col]])] <- median_value
+    }
+  }
   
+  
+  # #### test for spatial autocorrelation (yes!)
+  # 
+  # # Create neighbors list using Queen contiguity
+  # nb <- poly2nb(census_data[!is.na(census_data$employed_pct),], queen = TRUE)
+  # 
+  # # Create spatial weights (row-standardized)
+  # lw <- nb2listw(nb, style = "W", zero.policy = TRUE)
+  # 
+  # # Moran’s I test
+  # moran_test <- moran.test(census_data$employed_pct[!is.na(census_data$employed_pct)], lw, zero.policy = TRUE)
+  # 
+  # # Print results
+  # print(moran_test)
+  # 
+  # 
   
   # Perform a spatial join
   van_dat <- st_join(grid_vancouver, census_data)
   
   
   
+  # van_dat <- van_dat %>%
+  #   filter(!is.na(van_dat$household_income),
+  #          !is.na(van_dat$employed_pct),
+  #          !is.na(van_dat$female_pct),
+  #          !is.na(van_dat$`v_CA21_507: Total one-parent families`),
+  #          !is.na(van_dat$no_diploma_pct),
+  #          !is.na(van_dat$`v_CA21_4314: % of tenant households in subsidized housing (61)`),
+  #          !is.na(van_dat$pop_km),
+  #          !is.na(van_dat$`v_CA21_4274: Major repairs needed`),
+  #          !is.na(van_dat$`v_CA21_4260: Total - Private households by housing suitability`),
+  #          !is.na(van_dat$rent_pct),
+  #          !is.na(van_dat$`v_CA21_4315: % of tenant households spending 30% or more of its income on shelter costs (55)`),
+  #          !is.na(van_dat$`v_CA21_452: Average household size`),
+  #          !is.na(van_dat$separated_divorced_widowed_pct))  # Removes rows empty of census data
+  # 
+  # 
   ### save in file, indicating contents (food waste + demographic vars)
   save(van_dat, file = here("data","van_dat_750.Rdata"))
 } else {
@@ -393,7 +435,8 @@ if (gen_lc) {
   lcc2020 <- rast(file_path)
   
   lcc2020 <- project(lcc2020, "EPSG:3857")
-  van_ext<- c(-13715667.2184339, -13702478.8456052, 6313777.37423673, 6325346.85547016)
+  van_ext <- ext(project(vect(van_dat), "EPSG:3857"))
+  #van_ext<- c(-13715667.2184339, -13702478.8456052, 6313777.37423673, 6325346.85547016)
   lcc2020_van <- crop(lcc2020, van_ext)
   lcc2020_van <- as.int(lcc2020_van)
   
@@ -424,6 +467,25 @@ if (gen_lc) {
   #lc_prop$grid_id <- 1:nrow(lc_prop)
   van_dat <- left_join(van_dat, lc_prop_clean, by = "grid_id")
   rm(lcc2020,lcc2020_van, lc_prop)
+  
+  van_dat <- van_dat %>%
+    filter(!is.na(van_dat$rent_pct)) ### filter that removes cells without any census data
+  
+  
+  port_shape <- st_read(here("data", "port_removal.kml"))
+  port_shape <- st_transform(port_shape, crs = st_crs(van_dat))
+  
+  # Check intersection: returns logical vector
+  intersects <- st_intersects(van_dat, port_shape, sparse = FALSE)[, 1]
+  sum(intersects)
+  
+  plot(st_geometry(van_dat), col = "grey")
+  plot(st_geometry(port_shape), border = "red", add = TRUE)
+  
+  
+  # Remove features that intersect the drawn shape
+  van_dat <- van_dat[!intersects, ]
+  
   ### save file
   save(van_dat, file = here("data","van_dat_demo_lc_750.Rdata"))
   
@@ -432,10 +494,6 @@ if (gen_lc) {
   load(file = here("data", "van_dat_demo_lc_750.Rdata"))
 }
 
-
-
-van_dat <- van_dat %>%
-  filter(!is.na(van_dat$renters))  # Removes rows empty of census data
 
 #########################################################################################################
 ############## Module 5: read in food retail location data #################
@@ -485,9 +543,6 @@ if (gen_foodretail) {
   vendors_sf <- st_as_sf(vendors, coords = c("longitude", "latitude"), crs = 4326)
   
   
-  ## object called "dat_grid"
-  load(file = here("data", "van_dat_demo_lc_750.Rdata"))
-  
   food_stores <- food_stores %>%
     mutate(
       lon = geo_point_2d$lon,
@@ -497,7 +552,7 @@ if (gen_foodretail) {
   
   food_stores <- food_stores[, -c(1:4,8,9:11)]
   
-  food_stores <- st_transform(food_stores, st_crs(dat_grid))
+  food_stores <- st_transform(food_stores, st_crs(van_dat))
   
   
   
@@ -507,7 +562,7 @@ if (gen_foodretail) {
       lat = geo_point_2d$lat
     ) %>%
     st_as_sf(coords = c("lon", "lat"), crs = 3857)
-  vendors_sf <- st_transform(vendors_sf, st_crs(dat_grid))
+  vendors_sf <- st_transform(vendors_sf, st_crs(van_dat))
   
   vendors_sf <- vendors_sf %>%
     rename(retail_category = vendor_type)
@@ -526,7 +581,7 @@ if (gen_foodretail) {
   lowcost_food_sf <- lowcost_food_sf %>%
     mutate(lon = st_coordinates(.)[,1],  # X = longitude
            lat = st_coordinates(.)[,2])  # Y = latitude
-  lowcost_food_sf <- st_transform(lowcost_food_sf, st_crs(dat_grid))
+  lowcost_food_sf <- st_transform(lowcost_food_sf, st_crs(van_dat))
   
   lowcost_food_sf$retail_category <- "free_lowcost_food"
   lowcost_food_sf <- lowcost_food_sf %>%
@@ -613,7 +668,7 @@ if (gen_foodretail) {
     
   })
   
-  van_dat <- van_dat[,-c(139:143)]
+  van_dat <- van_dat[,-c(140:144)]
 
   
   # Ensure both datasets are in WGS84
@@ -785,8 +840,8 @@ if (gen_finalmods) {
   van_dat$NaturalVegSum <- van_dat$Conifer +van_dat$Deciduous+van_dat$Shrub +van_dat$NatGrassHerb
   van_dat$BuiltSum <- van_dat$Paved+van_dat$Buildings+van_dat$OtherBuilt
   van_dat$GrassSoilSum <- van_dat$ModGrassHerb + van_dat$Soil
-  van_dat$housing_lowdensity <- van_dat$single_detached + van_dat$semi_detached + van_dat$row_houses ### rowhouses may need to be removed, because vancouver doesn't uniformly service ALL of these
-  van_dat$housing_highdensity <- van_dat$apt_flat + van_dat$low_rise + van_dat$high_rise
+  van_dat$housing_lowdensity <- (van_dat$single_detached + van_dat$semi_detached + van_dat$row_houses)/van_dat$`v_CA21_434: Occupied private dwellings by structural type of dwelling data` ### rowhouses may need to be removed, because vancouver doesn't uniformly service ALL of these
+  van_dat$housing_highdensity <- (van_dat$apt_flat + van_dat$low_rise + van_dat$high_rise)/van_dat$`v_CA21_434: Occupied private dwellings by structural type of dwelling data`
   van_dat$housing_suitability <- van_dat$`v_CA21_4261: Suitable`/van_dat$`v_CA21_4260: Total - Private households by housing suitability`
   van_dat$pct_unsuitable_housing <- 1 - van_dat$housing_suitability
   van_dat$pct_unsuitable_housing[van_dat$pct_unsuitable_housing == 1] <- 0 ### replaces Pacific Spirit and Ocean near 2nd beach with 0s (i.e., no housing at all)
@@ -852,7 +907,7 @@ if (gen_factanal) {
   
   # Define the variables to keep in the heatmap
   selected_vars <- c("rent_pct","nearest_shelter_dist","nearest_food_retail", "pop_km","household_income","employed_pct" ,"no_diploma_pct","separated_divorced_widowed_pct",
-                     "female_pct","one_parent_pct", "avg_household_size","housing_highdensity", "housing_lowdensity",
+                     "female_pct","one_parent_pct", "avg_household_size","housing_highdensity",
                      "pct_major_repairs", "pct_rent_thirty", "pct_rent_subsidized", "pct_unsuitable_housing")
   
   
@@ -861,7 +916,7 @@ if (gen_factanal) {
   # Ensure the selected variables exist in the dataset
   van_dat_factors <- van_dat_scaled %>% select(any_of(selected_vars))
   van_dat_matrix <- as.matrix(van_dat_factors)
-  van_dat_matrix <- van_dat_matrix[,1:17]
+  van_dat_matrix <- van_dat_matrix[,1:16]
   storage.mode(van_dat_matrix) <- "double"  # Just to be sure
   
   # Then project:
@@ -875,6 +930,3 @@ if (gen_factanal) {
   ## object called "dat_final"
   load(file = here("data", "van_dat_final_750.Rdata"))
 }
-
-
-
